@@ -1,0 +1,29 @@
+name: Daily CGV Scraper
+
+on:
+  schedule:
+    # Runs at 08:00 UTC everyday
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  cgv-scraper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run CGV Scraper
+        env:
+          ENV: production
+          DISCORD_WEBHOOK_CGV: ${{ secrets.DISCORD_WEBHOOK_CGV }}
+        run: python src/cgv_scraper.py

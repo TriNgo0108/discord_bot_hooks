@@ -1,0 +1,30 @@
+name: Daily Expense Report
+
+on:
+  schedule:
+    # Runs at 23:55 UTC everyday
+    - cron: '55 23 * * *'
+  workflow_dispatch:
+
+jobs:
+  expense-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Expense Report
+        env:
+          ENV: production
+          DB_URL: ${{ secrets.DB_URL }}
+          DISCORD_WEBHOOK_EXPENSE: ${{ secrets.DISCORD_WEBHOOK_EXPENSE }}
+        run: python src/expense_report.py

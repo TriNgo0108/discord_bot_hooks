@@ -1,0 +1,30 @@
+name: Daily Gmail Summary
+
+on:
+  schedule:
+    # Runs at 08:00 UTC everyday
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  gmail-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Gmail Reader
+        env:
+          ENV: production
+          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
+          DISCORD_WEBHOOK_GMAIL: ${{ secrets.DISCORD_WEBHOOK_GMAIL }}
+        run: python src/gmail_reader.py
