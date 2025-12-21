@@ -54,7 +54,7 @@ To enable the Gmail reader, you need to generate a `token.json` file.
 
 **For GitHub Actions**:
 -   Open `token.json`, copy the content.
--   Ideally, base64 encode it to avoid JSON parsing issues in secrets (though raw might work if quoted properly, base64 is safer).
+-   Base64 encode it to avoid JSON parsing issues in secrets (though raw might work if quoted properly, base64 is safer).
 -   Add it as a secret named `GMAIL_TOKEN`.
 
 ## GitHub Secrets
