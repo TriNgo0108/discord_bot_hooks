@@ -1,8 +1,9 @@
-import os
-import psycopg2
-import httpx
 import datetime
+import os
 from collections import defaultdict
+
+import httpx
+import psycopg2
 
 # Only load .env for local development
 if os.getenv("ENV") != "production":
@@ -55,9 +56,7 @@ def format_expense_message(expense_rows):
 
     for amount, category_name, subcategory_name in expense_rows:
         categories[category_name]["total"] += float(amount)
-        categories[category_name]["subcategories"].append(
-            (subcategory_name, float(amount))
-        )
+        categories[category_name]["subcategories"].append((subcategory_name, float(amount)))
 
     # Build message
     today_date = datetime.date.today().strftime("%Y-%m-%d")

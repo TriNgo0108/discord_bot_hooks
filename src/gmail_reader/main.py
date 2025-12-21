@@ -1,9 +1,10 @@
-import os
-import imaplib
-import email
-from email.header import decode_header
-import httpx
 import datetime
+import email
+import imaplib
+import os
+from email.header import decode_header
+
+import httpx
 
 # Only load .env for local development
 if os.getenv("ENV") != "production":
@@ -44,9 +45,7 @@ def fetch_recent_emails():
         mail.select("INBOX")
 
         # Search for emails from the last 24 hours
-        yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime(
-            "%d-%b-%Y"
-        )
+        yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%d-%b-%Y")
         status, message_ids = mail.search(None, f"(SINCE {yesterday})")
 
         if status != "OK":
@@ -110,7 +109,9 @@ def send_discord_webhook(emails):
     today_date = datetime.date.today().strftime("%Y-%m-%d")
 
     if not emails:
-        message = f"**Daily Gmail Summary** 📧 ({today_date})\n\nNo new emails in the last 24 hours. ✅"
+        message = (
+            f"**Daily Gmail Summary** 📧 ({today_date})\n\nNo new emails in the last 24 hours. ✅"
+        )
         httpx.post(DISCORD_WEBHOOK_URL, json={"content": message})
         return
 
