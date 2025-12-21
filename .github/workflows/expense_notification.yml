@@ -2,8 +2,7 @@ name: Daily Expense Report
 
 on:
   schedule:
-    # Runs at 23:55 UTC everyday
-    - cron: '55 23 * * *'
+    - cron: '00 13 * * *'
   workflow_dispatch:
 
 jobs:

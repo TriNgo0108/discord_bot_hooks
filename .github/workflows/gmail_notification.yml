@@ -2,8 +2,7 @@ name: Daily Gmail Summary
 
 on:
   schedule:
-    # Runs at 08:00 UTC everyday
-    - cron: '0 8 * * *'
+    - cron: '0 1 * * *'
   workflow_dispatch:
 
 jobs:
