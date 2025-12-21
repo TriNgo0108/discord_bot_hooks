@@ -105,13 +105,13 @@ def send_discord_webhook(emails):
         email_entry = f"**From:** {email['from']}\n**Sub:** {email['subject']}\n> {email['snippet']}\n\n"
         
         if len(message) + len(email_entry) > 1900:
-            requests.post(DISCORD_WEBHOOK_URL, json={'content': message})
+            httpx.post(DISCORD_WEBHOOK_URL, json={'content': message})
             message = email_entry
         else:
             message += email_entry
             
     if message:
-        requests.post(DISCORD_WEBHOOK_URL, json={'content': message})
+        httpx.post(DISCORD_WEBHOOK_URL, json={'content': message})
 
 def main():
     """Main entry point for Gmail reader."""
