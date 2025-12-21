@@ -69,8 +69,3 @@ You must set the following secrets in your GitHub Repository settings:
 | `DISCORD_WEBHOOK_GMAIL`   | Webhook for Gmail Summary                        |
 | `GMAIL_TOKEN`             | Content of `token.json` (preferably base64)      |
 
-## Workflows
-
--   `expense_notification.yml`: Runs daily at 23:55 UTC.
--   `cgv_notification.yml`: Runs daily at 08:00 UTC.
--   `gmail_notification.yml`: Runs daily at 08:00 UTC.
