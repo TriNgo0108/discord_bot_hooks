@@ -21,6 +21,9 @@ jobs:
         run: |
           pip install -r src/cgv_scraper/requirements.txt
 
+      - name: Install Playwright browsers
+        run: playwright install chromium
+
       - name: Run CGV Scraper
         env:
           ENV: production
