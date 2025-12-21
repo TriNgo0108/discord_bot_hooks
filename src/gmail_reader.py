@@ -15,26 +15,15 @@ if os.getenv('ENV') != 'production':
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_GMAIL')
 
 def get_credentials():
-    # Priority 1: Environment Variables (GitHub Actions)
-    # Expected format: JSON string (optionally base64 encoded to be safe)
+    """Load credentials from base64-encoded GMAIL_TOKEN environment variable."""
     env_token = os.getenv('GMAIL_TOKEN')
     
-    if env_token:
-        try:
-            # Try decoding base64 first
-            token_json = base64.b64decode(env_token).decode('utf-8')
-        except Exception:
-            # If not base64, assume raw json string
-            token_json = env_token
-            
-        info = json.loads(token_json)
-        return Credentials.from_authorized_user_info(info)
-
-    # Priority 2: Local file
-    if os.path.exists('token.json'):
-        return Credentials.from_authorized_user_file('token.json')
-        
-    return None
+    if not env_token:
+        return None
+    
+    token_json = base64.b64decode(env_token).decode('utf-8')
+    info = json.loads(token_json)
+    return Credentials.from_authorized_user_info(info)
 
 def get_emails():
     creds = get_credentials()
@@ -86,21 +75,33 @@ def send_discord_webhook(emails):
     today_str = datetime.date.today().strftime('%Y-%m-%d')
         
     if not emails:
-        message = f"**Daily Gmail Summary** \U0001F4E7 ({today_str})\n\nNo new emails in the last 24 hours. \u2705"
+        message = (
+            f"# 📧 Daily Gmail Summary\n"
+            f"📅 **Date:** {today_str}\n\n"
+            f"✅ No new emails in the last 24 hours."
+        )
         requests.post(DISCORD_WEBHOOK_URL, json={'content': message})
         return
 
-
-    message = f"**Daily Gmail Summary** \U0001F4E7 ({today_str})\n\n"
+    header = (
+        f"# 📧 Daily Gmail Summary\n"
+        f"📅 **Date:** {today_str}\n"
+        f"📬 **New emails:** {len(emails)}\n\n"
+        f"---\n\n"
+    )
     
-    for email in emails:
-        # Simple formatting
-        entry = f"**From:** {email['from']}\n**Sub:** {email['subject']}\n> {email['snippet']}\n\n"
+    message = header
+    
+    for i, email in enumerate(emails, 1):
+        entry = (
+            f"**{i}. {email['subject']}**\n"
+            f"👤 {email['from']}\n"
+            f"> {email['snippet']}\n\n"
+        )
         
         if len(message) + len(entry) > 1900:
-             # Send chunk
-             requests.post(DISCORD_WEBHOOK_URL, json={'content': message})
-             message = entry
+            requests.post(DISCORD_WEBHOOK_URL, json={'content': message})
+            message = entry
         else:
             message += entry
             

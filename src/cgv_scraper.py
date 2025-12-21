@@ -79,15 +79,19 @@ def send_discord_message(section_name, movies):
     # Discord has 2000 char limit. Split if necessary.
     # We'll just send a simplified lists.
     
-    lines = [f"**{section_name}** \U0001F3AC"]
+    lines = [
+        f"# 🎬 CGV Vietnam — {section_name}",
+        "---",
+        ""
+    ]
     
     for m in movies:
-        line = f"- [{m['title']}]({m['link']})"
+        line = f"🎥 [{m['title']}]({m['link']})"
         if m['release_date'] != "N/A":
-             line += f" (Start: {m['release_date']})"
+            line += f" — 📅 {m['release_date']}"
         lines.append(line)
-        
-    message = "\n".join(lines)
+    
+    lines.append("")
     
     # Chunking
     chunks = []

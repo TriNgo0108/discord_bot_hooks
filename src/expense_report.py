@@ -43,7 +43,7 @@ def fetch_expense_data():
 
 def format_message(rows):
     if not rows:
-        return "No expenses recorded for today so far. \u2705"
+        return "No expenses recorded for today so far. ✅"
 
     total_expense = sum(row[0] for row in rows)
     
@@ -56,16 +56,23 @@ def format_message(rows):
     
     # Build Message
     today_str = datetime.date.today().strftime('%Y-%m-%d')
-    message = f"**Daily Expense Report** \U0001F4C8 ({today_str})\n"
-    message += f"**Total: ${total_expense:,.2f}**\n\n"
+    
+    lines = [
+        f"# 📈 Daily Expense Report",
+        f"� **Date:** {today_str}",
+        f"💰 **Total:** ${total_expense:,.2f}",
+        "",
+        "---",
+        ""
+    ]
     
     for cat, data in categories.items():
-        message += f"**{cat}**: ${data['total']:,.2f}\n"
+        lines.append(f"📁 **{cat}** — ${data['total']:,.2f}")
         for sub, amount in data['subs']:
-            message += f" - {sub}: ${amount:,.2f}\n"
-        message += "\n"
+            lines.append(f"   └ {sub}: ${amount:,.2f}")
+        lines.append("")
         
-    return message.strip()
+    return "\n".join(lines).strip()
 
 def send_discord_webhook(message):
     if not DISCORD_WEBHOOK_URL:

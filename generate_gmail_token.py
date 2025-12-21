@@ -1,4 +1,5 @@
 import os.path
+import base64
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -27,9 +28,18 @@ def main():
             creds = flow.run_local_server(port=0)
         
         # Save the credentials for the next run
+        token_json = creds.to_json()
         with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+            token.write(token_json)
             print("token.json created successfully!")
+        
+        # Output base64 encoded token for GitHub Secrets (GMAIL_TOKEN)
+        token_base64 = base64.b64encode(token_json.encode('utf-8')).decode('utf-8')
+        print("\n" + "="*60)
+        print("Base64-encoded token for GMAIL_TOKEN secret:")
+        print("="*60)
+        print(token_base64)
+        print("="*60)
 
 if __name__ == '__main__':
     main()
