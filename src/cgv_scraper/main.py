@@ -1,8 +1,9 @@
 import os
 import re
+
 import httpx
-from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 
 # Only load .env for local development
 if os.getenv("ENV") != "production":
@@ -20,9 +21,9 @@ URLS = {
 
 def get_movies(url):
     """Scrape movie information from CGV website using Playwright."""
-    with sync_playwright() as p:
+    with sync_playwright() as playwright_instance:
         # Launch headless browser
-        browser = p.chromium.launch(headless=True)
+        browser = playwright_instance.chromium.launch(headless=True)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             locale="vi-VN",
