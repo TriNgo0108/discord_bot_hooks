@@ -26,7 +26,7 @@ def fetch_daily_expenses():
         SELECT SUM(amount) as total, category, sub_category
         FROM public.transaction_read_model
         WHERE transaction_date::date = CURRENT_DATE
-        AND type = 'expense'
+        AND UPPER(type) = 'EXPENSE'
         GROUP BY category, sub_category
         ORDER BY category, sub_category;
     """
