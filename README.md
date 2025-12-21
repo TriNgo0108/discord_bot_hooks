@@ -67,5 +67,6 @@ You must set the following secrets in your GitHub Repository settings:
 | `DISCORD_WEBHOOK_EXPENSE` | Webhook for Expense Reports                      |
 | `DISCORD_WEBHOOK_CGV`     | Webhook for CGV Updates                          |
 | `DISCORD_WEBHOOK_GMAIL`   | Webhook for Gmail Summary                        |
-| `GMAIL_TOKEN`             | Content of `token.json` (preferably base64)      |
+| `GMAIL_ADDRESS`           | Your Gmail email address                         |
+| `GMAIL_APP_PASSWORD`      | Gmail App Password (not your regular password)   |
 
