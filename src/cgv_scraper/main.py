@@ -153,7 +153,7 @@ def send_discord_message(section_name, movies):
     header_embed = {
         "title": f"🎬 {section_name}",
         "color": header_color,
-        "description": f"{len(embeds)} phim",
+        "description": f"{len(embeds)} movies",
     }
     httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": [header_embed]})
 
