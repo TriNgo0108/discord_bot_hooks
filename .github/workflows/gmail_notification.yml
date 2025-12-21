@@ -19,11 +19,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r src/gmail_reader/requirements.txt
 
       - name: Run Gmail Reader
         env:
           ENV: production
           GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
           DISCORD_WEBHOOK_GMAIL: ${{ secrets.DISCORD_WEBHOOK_GMAIL }}
-        run: python src/gmail_reader.py
+        run: python src/gmail_reader/main.py

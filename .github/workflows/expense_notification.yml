@@ -19,11 +19,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r src/expense_report/requirements.txt
 
       - name: Run Expense Report
         env:
           ENV: production
           DB_URL: ${{ secrets.DB_URL }}
           DISCORD_WEBHOOK_EXPENSE: ${{ secrets.DISCORD_WEBHOOK_EXPENSE }}
-        run: python src/expense_report.py
+        run: python src/expense_report/main.py

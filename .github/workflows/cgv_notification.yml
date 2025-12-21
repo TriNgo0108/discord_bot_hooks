@@ -19,10 +19,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r src/cgv_scraper/requirements.txt
 
       - name: Run CGV Scraper
         env:
           ENV: production
           DISCORD_WEBHOOK_CGV: ${{ secrets.DISCORD_WEBHOOK_CGV }}
-        run: python src/cgv_scraper.py
+        run: python src/cgv_scraper/main.py
