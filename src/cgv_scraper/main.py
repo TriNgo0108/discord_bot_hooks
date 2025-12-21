@@ -16,16 +16,28 @@ URLS = {
 }
 
 def get_movies(url):
-    # Some sites block python-requests, so we add a user-agent
+    """Scrape movie information from CGV website."""
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
     }
     
-    try:
-        response = httpx.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-    except httpx.HTTPStatusError:
-        response = httpx.get(url, headers=headers, verify=False, timeout=10)
+    # Longer timeout and retry logic for flaky connections
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with httpx.Client(timeout=30, verify=False, follow_redirects=True) as client:
+                response = client.get(url, headers=headers)
+                response.raise_for_status()
+                break
+        except (httpx.TimeoutException, httpx.HTTPStatusError) as e:
+            if attempt == max_retries - 1:
+                raise e
+            print(f"Attempt {attempt + 1} failed, retrying...")
         
     soup = BeautifulSoup(response.content, 'html.parser')
     
