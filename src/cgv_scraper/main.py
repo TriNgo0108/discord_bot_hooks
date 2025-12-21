@@ -1,83 +1,106 @@
 import os
 import re
 import httpx
+from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 
 # Only load .env for local development
-if os.getenv('ENV') != 'production':
+if os.getenv("ENV") != "production":
     from dotenv import load_dotenv
+
     load_dotenv()
 
-DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_CGV')
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_CGV")
 
 URLS = {
     "Now Showing": "https://www.cgv.vn/default/movies/now-showing.html",
-    "Coming Soon": "https://www.cgv.vn/default/movies/coming-soon-1.html"
+    "Coming Soon": "https://www.cgv.vn/default/movies/coming-soon-1.html",
 }
 
+
 def get_movies(url):
-    """Scrape movie information from CGV website."""
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-    }
-    
-    # Longer timeout and retry logic for flaky connections
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            with httpx.Client(timeout=30, verify=False, follow_redirects=True) as client:
-                response = client.get(url, headers=headers)
-                response.raise_for_status()
-                break
-        except (httpx.TimeoutException, httpx.HTTPStatusError) as e:
-            if attempt == max_retries - 1:
-                raise e
-            print(f"Attempt {attempt + 1} failed, retrying...")
-        
-    soup = BeautifulSoup(response.content, 'html.parser')
-    
+    """Scrape movie information from CGV website using Playwright."""
+    with sync_playwright() as p:
+        # Launch headless browser
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            locale="vi-VN",
+        )
+        page = context.new_page()
+
+        # Navigate and wait for content to load
+        page.goto(url, wait_until="networkidle", timeout=60000)
+
+        # Wait for movie grid to appear
+        page.wait_for_selector(".products-grid .item", timeout=30000)
+
+        html_content = page.content()
+        browser.close()
+
+    soup = BeautifulSoup(html_content, "html.parser")
     movies = []
-    
-    # Try to find the movie grid
-    # CGV structure usually: .products-grid > .item > .product-info
-    items = soup.select('.products-grid .item')
-    
+
+    items = soup.select(".products-grid .item")
+
     for item in items:
-        title_element = item.select_one('.product-name a')
+        title_element = item.select_one(".product-name a")
         if not title_element:
             continue
-            
+
         title = title_element.get_text(strip=True)
-        link = title_element['href']
-        
-        # Release date often in .movie-date or part of text info
+        link = title_element["href"]
+
+        # Extract movie poster image (try to get highest quality)
+        image_url = None
+        img_element = item.select_one("img")
+        if img_element:
+            # Try different attributes for best quality
+            image_url = (
+                img_element.get("data-original")
+                or img_element.get("data-src")
+                or img_element.get("src")
+            )
+            # CGV often has resized images, try to get full size
+            if image_url:
+                # Remove common resize parameters
+                image_url = re.sub(r"/resize/\d+x\d+/", "/", image_url)
+                image_url = re.sub(r"\?.*$", "", image_url)  # Remove query params
+
+        # Release date extraction
         release_date = "N/A"
-        date_element = item.select_one('.cgv-movie-date')
-        
-        # If specific class not found, try finding text with "Khởi chiếu" (Released)
+        date_element = item.select_one(".cgv-movie-date")
+
         if not date_element:
             item_text = item.get_text()
-            if "Khởi chiếu:" in item_text:
-                date_match = re.search(r'Khởi chiếu:\s*([\d/]+)', item_text)
+            # Try to match various date formats
+            date_patterns = [
+                r"Khởi chiếu:\s*([\d/]+(?:/\d+)?(?:/\d+)?)",  # dd/mm/yyyy
+                r"(\d{1,2}/\d{1,2}/\d{4})",  # Full date format
+                r"(\d{1,2}/\d{1,2})",  # dd/mm format
+            ]
+            for pattern in date_patterns:
+                date_match = re.search(pattern, item_text)
                 if date_match:
                     release_date = date_match.group(1)
+                    break
         else:
             release_date = date_element.get_text(strip=True)
 
-        movies.append({
-            'title': title,
-            'link': link,
-            'release_date': release_date
-        })
-        
+        movies.append(
+            {
+                "title": title,
+                "link": link,
+                "release_date": release_date,
+                "image": image_url,
+            }
+        )
+
     return movies
 
+
 def send_discord_message(section_name, movies):
+    """Send movie list to Discord webhook with embeds."""
     if not DISCORD_WEBHOOK_URL:
         print("DISCORD_WEBHOOK_CGV not set, skipping Discord send.")
         return
@@ -85,34 +108,60 @@ def send_discord_message(section_name, movies):
     if not movies:
         return
 
-    # Discord has 2000 char limit. Split if necessary.
-    # We'll just send a simplified lists.
-    
-    lines = [f"**{section_name}** 🎬"]
-    
+    import datetime
+
+    today = datetime.date.today()
+
+    # Create embeds for each movie (Discord allows max 10 embeds per message)
+    embeds = []
+
     for movie in movies:
-        movie_line = f"- [{movie['title']}]({movie['link']})"
-        if movie['release_date'] != "N/A":
-            movie_line += f" (Start: {movie['release_date']})"
-        lines.append(movie_line)
-        
-    message = "\n".join(lines)
-    
-    # Split message into chunks (Discord has 2000 char limit)
-    message_chunks = []
-    current_message = ""
-    
-    for line in lines:
-        if len(current_message) + len(line) + 1 > 1900:
-            message_chunks.append(current_message)
-            current_message = line
-        else:
-            current_message = current_message + "\n" + line if current_message else line
-    
-    message_chunks.append(current_message)
-    
-    for message_chunk in message_chunks:
-        httpx.post(DISCORD_WEBHOOK_URL, json={'content': message_chunk})
+        release_date = movie["release_date"]
+
+        # Format date if only day number
+        if release_date != "N/A" and release_date.isdigit():
+            day = int(release_date)
+            if day < today.day:
+                next_month = today.month + 1 if today.month < 12 else 1
+                release_date = f"{day:02d}/{next_month:02d}"
+            else:
+                release_date = f"{day:02d}/{today.month:02d}"
+
+        # Different colors for sections
+        section_color = (
+            0x00D166 if "Now" in section_name else 0xFFA500
+        )  # Green for Now Showing, Orange for Coming Soon
+
+        embed = {
+            "title": movie["title"],
+            "url": movie["link"],
+            "color": section_color,
+        }
+
+        if release_date != "N/A":
+            embed["footer"] = {"text": f"📅 {release_date}"}
+
+        if movie.get("image"):
+            embed["thumbnail"] = {"url": movie["image"]}
+
+        embeds.append(embed)
+
+    # Send header as a larger embed first
+    header_color = (
+        0x00D166 if "Now" in section_name else 0xFFA500
+    )  # Green for Now Showing, Orange for Coming Soon
+    header_embed = {
+        "title": f"🎬 {section_name}",
+        "color": header_color,
+        "description": f"{len(embeds)} phim",
+    }
+    httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": [header_embed]})
+
+    # Send movies in batches of 10 (Discord limit)
+    for i in range(0, len(embeds), 10):
+        batch = embeds[i : i + 10]
+        httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": batch})
+
 
 def main():
     for name, url in URLS.items():
@@ -123,6 +172,7 @@ def main():
             send_discord_message(name, movies)
         except Exception as e:
             print(f"Error scraping {name}: {e}")
+
 
 if __name__ == "__main__":
     main()
