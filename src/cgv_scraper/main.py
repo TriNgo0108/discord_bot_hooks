@@ -31,10 +31,13 @@ def get_movies(url):
         page = context.new_page()
 
         # Navigate and wait for content to load
-        page.goto(url, wait_until="networkidle", timeout=60000)
+        page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-        # Wait for movie grid to appear
-        page.wait_for_selector(".products-grid .item", timeout=30000)
+        # Wait for movie grid to appear (longer timeout for CI environments)
+        page.wait_for_selector(".products-grid .item", timeout=45000)
+
+        # Small delay to ensure dynamic content is fully rendered
+        page.wait_for_timeout(2000)
 
         html_content = page.content()
         browser.close()

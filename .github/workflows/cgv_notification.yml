@@ -22,7 +22,7 @@ jobs:
           pip install -r src/cgv_scraper/requirements.txt
 
       - name: Install Playwright browsers
-        run: playwright install chromium
+        run: playwright install chromium --with-deps
 
       - name: Run CGV Scraper
         env:
