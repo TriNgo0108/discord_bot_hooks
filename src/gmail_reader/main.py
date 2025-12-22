@@ -93,13 +93,19 @@ def convert_html_to_markdown(html_content):
     text = re.sub(r"<em>(.*?)</em>", r"*\1*", text, flags=re.IGNORECASE)
 
     # Convert links
-    # Change: capture text inside, if empty, maybe use URL or ignore
+    # Convert links
     def replace_link(match):
         url = match.group(1)
-        text = match.group(2).strip()
-        if not text:
-            return ""  # Skip empty links like tracking pixels or layout images
-        return f"[{text}]({url})"
+        content = match.group(2).strip()
+
+        # Remove tags from the link content to see if it has visible text
+        # (e.g., skip links that only contain images or are empty)
+        visible_text = re.sub(r"<[^>]+>", "", content).strip()
+
+        if not visible_text:
+            return ""
+
+        return f"[{visible_text}]({url})"
 
     text = re.sub(
         r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', replace_link, text, flags=re.IGNORECASE
@@ -111,10 +117,13 @@ def convert_html_to_markdown(html_content):
     text = re.sub(r"<ul>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"</ul>", "\n", text, flags=re.IGNORECASE)
 
-    # Convert <br> and <p>
+    # Convert <br>, <p>, <div>, <tr>, headers
     text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"</p>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"<p[^>]*>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</div>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</tr>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</h[1-6]>", "\n\n", text, flags=re.IGNORECASE)
 
     # Remove remaining tags
     text = re.sub(r"<[^>]+>", "", text)
@@ -127,8 +136,12 @@ def clean_text_content(text):
     if not text:
         return ""
 
-    # Decode HTML entities (Robustly)
-    text = html.unescape(text)
+    # Decode HTML entities (Robustly) - Loop to handle double encoding
+    for _ in range(3):
+        new_text = html.unescape(text)
+        if new_text == text:
+            break
+        text = new_text
 
     # Remove specific noise characters (Soft hyphens, invisible separators, etc.)
     # \u00ad (Soft Hyphen), \u200b (Zero Width Space), \u200c (ZWUJ), \u200d (ZWJ), \u2007 (Figure Space), \u034f (CGJ)
@@ -317,6 +330,37 @@ def send_discord_webhook(emails):
         body_text = email_data.get("body_text", "") or "No content"
         subject = email_data.get("subject", "No Subject")[:256]
         sender = email_data.get("from", "Unknown")[:256]
+
+        # Cleanup: Remove redundant Subject/Sender from the start of the body
+        # Many newsletters repeat this info in the pre-header or top HTML
+        lines = body_text.split("\n")
+        skip_index = 0
+        checks = [subject.strip().lower(), sender.strip().lower()]
+
+        # Check the first 5 non-empty lines
+        checked_lines = 0
+        for i, line in enumerate(lines):
+            clean_line = line.strip().lower()
+            if not clean_line:
+                continue
+
+            # Stop if we've checked too many lines
+            if checked_lines >= 5:
+                break
+
+            # If line matches subject or sender (or is contained in them, or contains them)
+            # We be conservative: exact match or "Sender <email>" pattern matches
+            if any(c in clean_line or clean_line in c for c in checks if c):
+                skip_index = i + 1
+            else:
+                # If we hit a substantial line that DOESN'T match, we stop stripping
+                # But often "Email from Substack" or similar might intervene?
+                # Let's simple break on mismatch to avoid eating content
+                break
+            checked_lines += 1
+
+        if skip_index > 0:
+            body_text = "\n".join(lines[skip_index:]).strip()
 
         # Chunk the body text smartly
         chunks = split_text_smartly(body_text, max_length=4000)
