@@ -2,8 +2,8 @@ name: Daily CGV Scraper
 
 on:
   schedule:
-    # 01:00 UTC = 08:00 UTC+7 (Vietnam time)
-    - cron: '0 1 * * *'
+    # 00:15 UTC = 07:15 UTC+7 (Vietnam time)
+    - cron: '15 0 * * *'
   workflow_dispatch:
 
 jobs:

@@ -2,8 +2,8 @@ name: Daily Gmail Summary
 
 on:
   schedule:
-    # 01:00 UTC = 08:00 UTC+7 (Vietnam time)
-    - cron: '0 1 * * *'
+    # 00:20 UTC = 07:20 UTC+7 (Vietnam time)
+    - cron: '20 0 * * *'
   workflow_dispatch:
 
 jobs:
