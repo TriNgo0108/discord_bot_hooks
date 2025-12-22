@@ -40,6 +40,17 @@ def parse_html_links(html_content):
     # Match <a href="url">text</a> patterns
     link_pattern = r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>([^<]*)</a>'
     matches = re.findall(link_pattern, html_content, re.IGNORECASE)
+
+    # Noise terms for links
+    skip_terms = [
+        "unsubscribe",
+        "preference",
+        "view in browser",
+        "privacy policy",
+        "terms of service",
+        "manage subscription",
+    ]
+
     for url, text in matches:
         text = text.strip()
         if url and not url.startswith("mailto:"):
@@ -51,6 +62,10 @@ def parse_html_links(html_content):
                 # Extract domain from URL for a cleaner label
                 domain_match = re.search(r"https?://(?:www\.)?([^/]+)", url)
                 text = domain_match.group(1) if domain_match else "Link"
+
+            # Filter out noise links
+            if any(term in text.lower() for term in skip_terms):
+                continue
 
             if len(text) > 50:
                 text = text[:47] + "..."
@@ -335,9 +350,19 @@ def send_discord_webhook(emails):
         # Many newsletters repeat this info in the pre-header or top HTML
         lines = body_text.split("\n")
         skip_index = 0
-        checks = [subject.strip().lower(), sender.strip().lower()]
 
-        # Check the first 5 non-empty lines
+        # Prepare checks
+        checks = [subject.strip().lower(), sender.strip().lower()]
+        noise_phrases = [
+            "email from substack",
+            "view in browser",
+            "unsubscribe",
+            "manage your subscription",
+            "confirm subscription",  # Often repeated title
+            "please confirm your subscription",
+        ]
+
+        # Check the first 10 non-empty lines
         checked_lines = 0
         for i, line in enumerate(lines):
             clean_line = line.strip().lower()
@@ -345,17 +370,21 @@ def send_discord_webhook(emails):
                 continue
 
             # Stop if we've checked too many lines
-            if checked_lines >= 5:
+            if checked_lines >= 10:
                 break
 
-            # If line matches subject or sender (or is contained in them, or contains them)
-            # We be conservative: exact match or "Sender <email>" pattern matches
+            is_noise = False
+            # Check for Sender/Subject overlapping
             if any(c in clean_line or clean_line in c for c in checks if c):
+                is_noise = True
+            # Check for generic noise phrases
+            elif any(phrase in clean_line for phrase in noise_phrases):
+                is_noise = True
+
+            if is_noise:
                 skip_index = i + 1
             else:
-                # If we hit a substantial line that DOESN'T match, we stop stripping
-                # But often "Email from Substack" or similar might intervene?
-                # Let's simple break on mismatch to avoid eating content
+                # If we hit a substantial line that isn't noise, we stop stripping
                 break
             checked_lines += 1
 
