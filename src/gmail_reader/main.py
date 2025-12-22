@@ -1,5 +1,6 @@
 import datetime
 import email
+import html
 import imaplib
 import os
 import re
@@ -76,34 +77,73 @@ def parse_html_images(html_content):
     return images[:1]  # Return only first image to avoid spam
 
 
-def convert_html_to_plain_text(html_content):
-    """Convert HTML content to readable plain text, preserving basic formatting."""
-    # Remove style and script tags
+def convert_html_to_markdown(html_content):
+    """Convert HTML content to Discord Markdown."""
+    if not html_content:
+        return ""
+
+    # Basic cleanup
     text = re.sub(r"<style[^>]*>.*?</style>", "", html_content, flags=re.DOTALL | re.IGNORECASE)
     text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.DOTALL | re.IGNORECASE)
-    # Convert <br> and <p> to newlines
-    text = re.sub(r"<br[^>]*>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"</p>", "\n", text, flags=re.IGNORECASE)
-    # Remove all other HTML tags
-    text = re.sub(r"<[^>]+>", "", text)
-    # Decode HTML entities
-    text = (
-        text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+
+    # Convert simple tags
+    text = re.sub(r"<b>(.*?)</b>", r"**\1**", text, flags=re.IGNORECASE)
+    text = re.sub(r"<strong>(.*?)</strong>", r"**\1**", text, flags=re.IGNORECASE)
+    text = re.sub(r"<i>(.*?)</i>", r"*\1*", text, flags=re.IGNORECASE)
+    text = re.sub(r"<em>(.*?)</em>", r"*\1*", text, flags=re.IGNORECASE)
+
+    # Convert links
+    # Change: capture text inside, if empty, maybe use URL or ignore
+    def replace_link(match):
+        url = match.group(1)
+        text = match.group(2).strip()
+        if not text:
+            return ""  # Skip empty links like tracking pixels or layout images
+        return f"[{text}]({url})"
+
+    text = re.sub(
+        r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', replace_link, text, flags=re.IGNORECASE
     )
-    # Clean up whitespace
+
+    # Convert lists
+    text = re.sub(r"<li>", "\n• ", text, flags=re.IGNORECASE)
+    text = re.sub(r"</li>", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"<ul>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</ul>", "\n", text, flags=re.IGNORECASE)
+
+    # Convert <br> and <p>
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</p>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<p[^>]*>", "\n", text, flags=re.IGNORECASE)
+
+    # Remove remaining tags
+    text = re.sub(r"<[^>]+>", "", text)
+
+    return clean_text_content(text)
+
+
+def clean_text_content(text):
+    """Clean up text by decoding entities and removing invisible characters."""
+    if not text:
+        return ""
+
+    # Decode HTML entities (Robustly)
+    text = html.unescape(text)
+
+    # Remove specific noise characters (Soft hyphens, invisible separators, etc.)
+    # \u00ad (Soft Hyphen), \u200b (Zero Width Space), \u200c (ZWUJ), \u200d (ZWJ), \u2007 (Figure Space), \u034f (CGJ)
+    text = re.sub(r"[\u00ad\u200b\u200c\u200d\u2007\u034f]", "", text)
+
+    # Clean up excessive whitespace created by stripping/decoding
+    # Replace non-breaking spaces with normal spaces first
+    text = text.replace("\xa0", " ")
+
+    # Collapse multiple spaces
     text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n\s*\n", "\n\n", text)
-    return text.strip()
 
+    # Fix multiple newlines (limit to 2 max)
+    text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
 
-def strip_urls_from_text(text):
-    """Remove raw HTTP/HTTPS URLs from text and clean up leftover artifacts."""
-    # Remove URLs (http, https)
-    text = re.sub(r"https?://[^\s<>\"']+", "", text)
-    # Clean up leftover punctuation and whitespace
-    text = re.sub(r"\s+", " ", text)
-    text = re.sub(r"\(\s*\)", "", text)  # Remove empty parentheses
-    text = re.sub(r"\[\s*\]", "", text)  # Remove empty brackets
     return text.strip()
 
 
@@ -121,10 +161,14 @@ def fetch_recent_emails():
 
         # Search for unread emails from the last 24 hours
         yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%d-%b-%Y")
-        status, message_ids = mail.search(None, f"(UNSEEN SINCE {yesterday})")
+        status, message_ids = mail.search(None, f"SINCE {yesterday}")
 
         if status != "OK":
             print("Failed to search emails.")
+            return []
+
+        if not message_ids[0]:
+            print("Found 0 messages.")
             return []
 
         email_ids = message_ids[0].split()
@@ -157,7 +201,7 @@ def fetch_recent_emails():
                     if content_type == "text/plain" and not snippet:
                         body = part.get_payload(decode=True)
                         if body:
-                            snippet = body.decode("utf-8", errors="ignore")[:800]
+                            snippet = body.decode("utf-8", errors="ignore")
                     elif content_type == "text/html" and not html_content:
                         body = part.get_payload(decode=True)
                         if body:
@@ -169,21 +213,29 @@ def fetch_recent_emails():
                     if content_type == "text/html":
                         html_content = body.decode("utf-8", errors="ignore")
                     else:
-                        snippet = body.decode("utf-8", errors="ignore")[:800]
+                        snippet = body.decode("utf-8", errors="ignore")
 
             # Extract links and images from HTML
             if html_content:
+                # Still extracting these for metadata if needed, but main body is markdown now
                 links = parse_html_links(html_content)
                 images = parse_html_images(html_content)
-                # If no plain text, convert HTML to text
-                if not snippet:
-                    snippet = convert_html_to_plain_text(html_content)[:800]
+
+                # Prefer HTML converted to Markdown, fall back to plain text
+                snippet = convert_html_to_markdown(html_content)
+            elif snippet:
+                # If only plain text exists, clean it up
+                snippet = clean_text_content(snippet)
+
+            # Fallback if empty
+            if not snippet:
+                snippet = "(No content)"
 
             emails.append(
                 {
                     "subject": subject,
                     "from": sender,
-                    "snippet": strip_urls_from_text(snippet.replace("\n", " ").replace("\r", "")),
+                    "body_text": snippet,  # Full content, formatted
                     "links": links,
                     "images": images,
                 }
@@ -195,6 +247,45 @@ def fetch_recent_emails():
     except Exception as e:
         print(f"IMAP error: {e}")
         return []
+
+
+def split_text_smartly(text, max_length=4000):
+    """Split text into chunks, trying to break at newlines to preserve Markdown formatting."""
+    chunks = []
+    current_pos = 0
+    text_len = len(text)
+
+    while current_pos < text_len:
+        # If remaining text fits, just add it
+        if text_len - current_pos <= max_length:
+            chunks.append(text[current_pos:])
+            break
+
+        # Get the candidate block
+        candidate = text[current_pos : current_pos + max_length]
+
+        # Look for the last newline to split safely
+        split_at = -1
+        last_newline = candidate.rfind("\n")
+
+        # If we found a newline and it's not too close to the beginning (avoid tiny chunks)
+        if last_newline > max_length * 0.2:
+            split_at = last_newline + 1  # Include the newline in the current chunk
+
+        # If no good newline, try space
+        if split_at == -1:
+            last_space = candidate.rfind(" ")
+            if last_space > max_length * 0.2:
+                split_at = last_space + 1
+
+        # If still no good split point, force hard split
+        if split_at == -1:
+            split_at = max_length
+
+        chunks.append(text[current_pos : current_pos + split_at])
+        current_pos += split_at
+
+    return chunks
 
 
 def send_discord_webhook(emails):
@@ -223,27 +314,52 @@ def send_discord_webhook(emails):
 
     # Send each email as an embed
     for email_data in emails:
-        # Build description with snippet
-        description = email_data["snippet"][:500] if email_data["snippet"] else "No content preview"
+        body_text = email_data.get("body_text", "") or "No content"
+        subject = email_data.get("subject", "No Subject")[:256]
+        sender = email_data.get("from", "Unknown")[:256]
 
-        # Add formatted links
-        if email_data["links"]:
-            description += "\n\n**🔗 Links:**\n"
-            for text, url in email_data["links"]:
-                description += f"• [{text}]({url})\n"
+        # Chunk the body text smartly
+        chunks = split_text_smartly(body_text, max_length=4000)
 
-        embed = {
-            "title": email_data["subject"][:256],  # Discord title limit
-            "description": description[:4096],  # Discord description limit
-            "color": 0x4285F4,  # Google blue
-            "author": {"name": email_data["from"][:256]},
-        }
+        if not chunks:
+            chunks = ["(No content)"]
 
-        # Add image if available
-        if email_data["images"]:
-            embed["image"] = {"url": email_data["images"][0]}
+        for i, chunk in enumerate(chunks):
+            description = chunk
 
-        httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": [embed]})
+            # If last chunk, append links
+            if i == len(chunks) - 1 and email_data["links"]:
+                description += "\n\n**🔗 Links:**\n"
+                for text, url in email_data["links"]:
+                    link_line = f"• [{text}]({url})\n"
+                    # Prevent overflowing 4096
+                    if len(description) + len(link_line) < 4090:
+                        description += link_line
+
+            # Embed Title logic
+            if i == 0:
+                title = subject
+                author_field = {"name": sender}
+            else:
+                title = f"{subject} (Part {i + 1})"
+                # Don't repeat author for subsequent parts to save space/cleanliness, or keep it?
+                # Let's keep it empty to show it's a continuation
+                author_field = {}
+
+            embed = {
+                "title": title,
+                "description": description,
+                "color": 0x4285F4,  # Google blue
+            }
+
+            if author_field:
+                embed["author"] = author_field
+
+            # Add image to first chunk only
+            if i == 0 and email_data["images"]:
+                embed["image"] = {"url": email_data["images"][0]}
+
+            httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": [embed]})
 
 
 def main():
