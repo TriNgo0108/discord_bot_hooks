@@ -26,10 +26,15 @@ jobs:
         run: playwright install chromium --with-deps
 
       - name: Setup Cloudflare WARP
-        uses: cloudflare/warp-action@v1
+        uses: Boostport/setup-cloudflare-warp@v1
+        with:
+          organization: ${{ secrets.CLOUDFLARE_ORGANIZATION }}
+          auth_client_id: ${{ secrets.CLOUDFLARE_AUTH_CLIENT_ID }}
+          auth_client_secret: ${{ secrets.CLOUDFLARE_AUTH_CLIENT_SECRET }}
 
       - name: Run CGV Scraper
         env:
           ENV: production
           DISCORD_WEBHOOK_CGV: ${{ secrets.DISCORD_WEBHOOK_CGV }}
         run: python src/cgv_scraper/main.py
+
