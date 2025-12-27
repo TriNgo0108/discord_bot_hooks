@@ -43,7 +43,7 @@ jobs:
           
           # Register new free client
           echo "Registering..."
-          warp-cli --accept-tos register
+          warp-cli --accept-tos registration new
           
           # Connect
           echo "Connecting..."
