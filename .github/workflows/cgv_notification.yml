@@ -25,6 +25,9 @@ jobs:
       - name: Install Playwright browsers
         run: playwright install chromium --with-deps
 
+      - name: Setup Cloudflare WARP
+        uses: cloudflare/warp-action@v1
+
       - name: Run CGV Scraper
         env:
           ENV: production
