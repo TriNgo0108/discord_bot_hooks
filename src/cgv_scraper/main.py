@@ -1,3 +1,5 @@
+import datetime
+import logging
 import os
 import re
 
@@ -5,65 +7,103 @@ import httpx
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 # Only load .env for local development
 if os.getenv("ENV") != "production":
     from dotenv import load_dotenv
 
     load_dotenv()
 
+# Configuration from environment variables
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_CGV")
 
+# Scraping Configuration
+CGV_NOW_SHOWING_URL = os.getenv(
+    "CGV_NOW_SHOWING_URL", "https://www.cgv.vn/default/movies/now-showing.html"
+)
+CGV_COMING_SOON_URL = os.getenv(
+    "CGV_COMING_SOON_URL", "https://www.cgv.vn/default/movies/coming-soon-1.html"
+)
+
 URLS = {
-    "Now Showing": "https://www.cgv.vn/default/movies/now-showing.html",
-    "Coming Soon": "https://www.cgv.vn/default/movies/coming-soon-1.html",
+    "Now Showing": CGV_NOW_SHOWING_URL,
+    "Coming Soon": CGV_COMING_SOON_URL,
 }
+
+# Timeout Configuration (in milliseconds for Playwright, seconds for httpx)
+PAGE_LOAD_TIMEOUT = int(os.getenv("PAGE_LOAD_TIMEOUT_MS", "120000"))
+SELECTOR_TIMEOUT = int(os.getenv("SELECTOR_TIMEOUT_MS", "45000"))
+RENDER_DELAY = int(os.getenv("RENDER_DELAY_MS", "5000"))
+HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT_SECONDS", "30"))
+
+# Browser Configuration
+USER_AGENT = os.getenv(
+    "USER_AGENT",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+)
+VIEWPORT_WIDTH = int(os.getenv("VIEWPORT_WIDTH", "1280"))
+VIEWPORT_HEIGHT = int(os.getenv("VIEWPORT_HEIGHT", "720"))
 
 
 def get_movies(url):
     """Scrape movie information from CGV website using Playwright."""
-    print(f"DEBUG: Launching browser for {url}...")
+    logger.info("Scraping %s", url)
+
     with sync_playwright() as playwright_instance:
-        # Launch headless browser with anti-bot args
-        browser = playwright_instance.chromium.launch(
-            headless=True,
-            args=[
+        launch_args = {
+            "headless": True,
+            "args": [
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
             ],
-        )
+        }
+
+        logger.debug("Launching browser...")
+        browser = playwright_instance.chromium.launch(**launch_args)
+
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            user_agent=USER_AGENT,
             locale="vi-VN",
-            viewport={"width": 1280, "height": 720},
+            viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
         )
         page = context.new_page()
 
         try:
             # Navigate and wait for content to load
-            print("DEBUG: Navigating to page...")
-            page.goto(url, wait_until="domcontentloaded", timeout=90000)  # Increased timeout
+            logger.debug("Navigating to page...")
+            page.goto(url, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT)
 
-            # Wait for movie grid to appear (longer timeout for CI environments)
-            print("DEBUG: Waiting for selector...")
-            page.wait_for_selector(".products-grid .item", timeout=60000)  # Increased timeout
+            # Wait for movie grid to appear
+            logger.debug("Waiting for selector...")
+            page.wait_for_selector(".products-grid .item", timeout=SELECTOR_TIMEOUT)
 
             # Small delay to ensure dynamic content is fully rendered
-            page.wait_for_timeout(5000)  # Increased delay
+            page.wait_for_timeout(RENDER_DELAY)
 
             html_content = page.content()
-            print(f"DEBUG: Successfully retrieved content (Length: {len(html_content)})")
+            logger.info("Successfully retrieved content (Length: %d)", len(html_content))
 
         except Exception as e:
-            print(f"ERROR: Playwright error: {e}")
+            logger.error("Playwright error: %s", e)
             html_content = ""
         finally:
             browser.close()
 
+    # Parse the HTML content
     soup = BeautifulSoup(html_content, "html.parser")
     movies = []
-
     items = soup.select(".products-grid .item")
+
+    if not items:
+        logger.warning("No items found.")
+        return []
 
     for item in items:
         title_element = item.select_one(".product-name a")
@@ -124,13 +164,11 @@ def get_movies(url):
 def send_discord_message(section_name, movies):
     """Send movie list to Discord webhook with embeds."""
     if not DISCORD_WEBHOOK_URL:
-        print("DISCORD_WEBHOOK_CGV not set, skipping Discord send.")
+        logger.warning("DISCORD_WEBHOOK_CGV not set, skipping Discord send.")
         return
 
     if not movies:
         return
-
-    import datetime
 
     today = datetime.date.today()
 
@@ -177,23 +215,23 @@ def send_discord_message(section_name, movies):
         "color": header_color,
         "description": f"{len(embeds)} movies",
     }
-    httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": [header_embed]})
+    httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": [header_embed]}, timeout=HTTP_TIMEOUT)
 
     # Send movies in batches of 10 (Discord limit)
     for i in range(0, len(embeds), 10):
         batch = embeds[i : i + 10]
-        httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": batch})
+        httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": batch}, timeout=HTTP_TIMEOUT)
 
 
 def main():
     for name, url in URLS.items():
-        print(f"Scraping {name}...")
+        logger.info("Scraping %s...", name)
         try:
             movies = get_movies(url)
-            print(f"Found {len(movies)} movies.")
+            logger.info("Found %d movies.", len(movies))
             send_discord_message(name, movies)
         except Exception as e:
-            print(f"Error scraping {name}: {e}")
+            logger.error("Error scraping %s: %s", name, e)
 
 
 if __name__ == "__main__":
