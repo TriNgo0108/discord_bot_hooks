@@ -33,6 +33,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cloudflare-warp
 
+          # Stop service first
+          sudo systemctl stop warp-svc
+          
+          # Clean up any previous state
+          sudo rm -rf /var/lib/cloudflare-warp/reg.json
+          sudo rm -rf /var/lib/cloudflare-warp/settings.json
+
           # Configure MDM for Service Auth
           sudo mkdir -p /var/lib/cloudflare-warp
           cat <<EOF | sudo tee /var/lib/cloudflare-warp/mdm.xml
@@ -52,16 +59,20 @@ jobs:
           </plist>
           EOF
 
-          # Restart and Connect
-          sudo systemctl restart warp-svc
+          # Start service
+          echo "Starting WARP service..."
+          sudo systemctl start warp-svc
           
-          # Wait for daemon to start and pick up MDM config
-          echo "Waiting for WARP daemon..."
-          sleep 10
+          # Wait heavily for daemon to initialize
+          echo "Waiting 15s for daemon..."
+          sleep 15
           
-          # Verify registration (MDM should handle this)
-          echo "Checking registration status..."
+          # Force registration check
+          echo "Checking status (triggering registration)..."
           warp-cli --accept-tos status
+          
+          # Wait again
+          sleep 5
           
           # Connect
           echo "Connecting..."
@@ -70,7 +81,7 @@ jobs:
           # Wait for connection
           sleep 10
           
-          # Check connection status
+          # Verify
           echo "Verifying connection..."
           warp-cli --accept-tos status
           curl -s https://www.cloudflare.com/cdn-cgi/trace
