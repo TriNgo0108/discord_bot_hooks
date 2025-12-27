@@ -55,6 +55,8 @@ jobs:
               <string>${{ secrets.CLOUDFLARE_AUTH_CLIENT_SECRET }}</string>
               <key>service_mode</key>
               <string>warp</string>
+              <key>auto_connect</key>
+              <integer>1</integer>
           </dict>
           </plist>
           EOF
@@ -64,15 +66,18 @@ jobs:
           sudo systemctl start warp-svc
           
           # Wait heavily for daemon to initialize
-          echo "Waiting 15s for daemon..."
-          sleep 15
+          echo "Waiting 20s for daemon..."
+          sleep 20
           
-          # Force registration check
-          echo "Checking status (triggering registration)..."
-          warp-cli --accept-tos status
-          
-          # Wait again
-          sleep 5
+          # Loop to check status until it's not "Daemon Startup"
+          for i in {1..5}; do
+            STATUS=$(warp-cli --accept-tos status)
+            echo "Attempt $i: $STATUS"
+            if [[ "$STATUS" != *"Daemon Startup"* ]]; then
+              break
+            fi
+            sleep 5
+          done
           
           # Connect
           echo "Connecting..."
