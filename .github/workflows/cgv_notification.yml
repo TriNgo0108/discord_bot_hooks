@@ -25,12 +25,40 @@ jobs:
       - name: Install Playwright browsers
         run: playwright install chromium --with-deps
 
-      - name: Setup Cloudflare WARP
-        uses: Boostport/setup-cloudflare-warp@v1
-        with:
-          organization: ${{ secrets.CLOUDFLARE_ORGANIZATION }}
-          auth_client_id: ${{ secrets.CLOUDFLARE_AUTH_CLIENT_ID }}
-          auth_client_secret: ${{ secrets.CLOUDFLARE_AUTH_CLIENT_SECRET }}
+      - name: Install and Configure Cloudflare WARP
+        run: |
+          # Install Cloudflare WARP
+          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+          sudo apt-get update
+          sudo apt-get install -y cloudflare-warp
+
+          # Configure MDM for Service Auth
+          sudo mkdir -p /var/lib/cloudflare-warp
+          cat <<EOF | sudo tee /var/lib/cloudflare-warp/mdm.xml
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>organization</key>
+              <string>${{ secrets.CLOUDFLARE_ORGANIZATION }}</string>
+              <key>auth_client_id</key>
+              <string>${{ secrets.CLOUDFLARE_AUTH_CLIENT_ID }}</string>
+              <key>auth_client_secret</key>
+              <string>${{ secrets.CLOUDFLARE_AUTH_CLIENT_SECRET }}</string>
+              <key>service_mode</key>
+              <string>warp</string>
+          </dict>
+          </plist>
+          EOF
+
+          # Restart and Connect
+          sudo systemctl restart warp-svc
+          sleep 5
+          warp-cli --accept-tos status
+          warp-cli --accept-tos connect
+          sleep 5
+          curl https://www.cloudflare.com/cdn-cgi/trace
 
       - name: Run CGV Scraper
         env:
