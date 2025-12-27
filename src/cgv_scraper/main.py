@@ -21,26 +21,44 @@ URLS = {
 
 def get_movies(url):
     """Scrape movie information from CGV website using Playwright."""
+    print(f"DEBUG: Launching browser for {url}...")
     with sync_playwright() as playwright_instance:
-        # Launch headless browser
-        browser = playwright_instance.chromium.launch(headless=True)
+        # Launch headless browser with anti-bot args
+        browser = playwright_instance.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+            ],
+        )
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             locale="vi-VN",
+            viewport={"width": 1280, "height": 720},
         )
         page = context.new_page()
 
-        # Navigate and wait for content to load
-        page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        try:
+            # Navigate and wait for content to load
+            print("DEBUG: Navigating to page...")
+            page.goto(url, wait_until="domcontentloaded", timeout=90000)  # Increased timeout
 
-        # Wait for movie grid to appear (longer timeout for CI environments)
-        page.wait_for_selector(".products-grid .item", timeout=45000)
+            # Wait for movie grid to appear (longer timeout for CI environments)
+            print("DEBUG: Waiting for selector...")
+            page.wait_for_selector(".products-grid .item", timeout=60000)  # Increased timeout
 
-        # Small delay to ensure dynamic content is fully rendered
-        page.wait_for_timeout(2000)
+            # Small delay to ensure dynamic content is fully rendered
+            page.wait_for_timeout(5000)  # Increased delay
 
-        html_content = page.content()
-        browser.close()
+            html_content = page.content()
+            print(f"DEBUG: Successfully retrieved content (Length: {len(html_content)})")
+
+        except Exception as e:
+            print(f"ERROR: Playwright error: {e}")
+            html_content = ""
+        finally:
+            browser.close()
 
     soup = BeautifulSoup(html_content, "html.parser")
     movies = []

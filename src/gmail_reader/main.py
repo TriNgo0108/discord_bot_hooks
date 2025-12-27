@@ -223,25 +223,31 @@ def fetch_recent_emails():
             links = []
             images = []
 
+            def get_decoded_payload(message_part):
+                """Helper to decode payload with correct charset."""
+                payload = message_part.get_payload(decode=True)
+                if not payload:
+                    return ""
+                charset = message_part.get_content_charset() or "utf-8"
+                try:
+                    return payload.decode(charset, errors="replace")
+                except LookupError:
+                    # Fallback for unknown encodings
+                    return payload.decode("utf-8", errors="replace")
+
             if msg.is_multipart():
                 for part in msg.walk():
                     content_type = part.get_content_type()
                     if content_type == "text/plain" and not snippet:
-                        body = part.get_payload(decode=True)
-                        if body:
-                            snippet = body.decode("utf-8", errors="ignore")
+                        snippet = get_decoded_payload(part)
                     elif content_type == "text/html" and not html_content:
-                        body = part.get_payload(decode=True)
-                        if body:
-                            html_content = body.decode("utf-8", errors="ignore")
+                        html_content = get_decoded_payload(part)
             else:
-                body = msg.get_payload(decode=True)
-                if body:
-                    content_type = msg.get_content_type()
-                    if content_type == "text/html":
-                        html_content = body.decode("utf-8", errors="ignore")
-                    else:
-                        snippet = body.decode("utf-8", errors="ignore")
+                content_type = msg.get_content_type()
+                if content_type == "text/html":
+                    html_content = get_decoded_payload(msg)
+                else:
+                    snippet = get_decoded_payload(msg)
 
             # Extract links and images from HTML
             if html_content:
@@ -258,6 +264,8 @@ def fetch_recent_emails():
             # Fallback if empty
             if not snippet:
                 snippet = "(No content)"
+
+            print(f"DEBUG: Processing email '{subject[:30]}...' - Body len: {len(snippet)}")
 
             emails.append(
                 {
@@ -375,10 +383,9 @@ def send_discord_webhook(emails):
 
             is_noise = False
             # Check for Sender/Subject overlapping
-            if any(c in clean_line or clean_line in c for c in checks if c):
-                is_noise = True
-            # Check for generic noise phrases
-            elif any(phrase in clean_line for phrase in noise_phrases):
+            if any(c in clean_line or clean_line in c for c in checks if c) or any(
+                phrase in clean_line for phrase in noise_phrases
+            ):
                 is_noise = True
 
             if is_noise:
