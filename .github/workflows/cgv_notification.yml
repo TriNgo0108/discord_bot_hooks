@@ -25,36 +25,6 @@ jobs:
       - name: Install Playwright browsers
         run: playwright install chromium --with-deps
 
-      - name: Install and Configure Consumer WARP
-        run: |
-          # Install Cloudflare WARP (commands from pkg.cloudflareclient.com)
-          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
-          sudo apt-get update
-          sudo apt-get install -y cloudflare-warp
-
-          # Start service
-          echo "Starting WARP..."
-          sudo systemctl start warp-svc
-          
-          # Wait a bit for daemon
-          echo "Waiting 5s for daemon..."
-          sleep 5
-          
-          # Register new free client
-          echo "Registering..."
-          warp-cli --accept-tos registration new
-          
-          # Connect
-          echo "Connecting..."
-          warp-cli --accept-tos connect
-          
-          # Verify connection
-          sleep 5
-          echo "Verifying..."
-          warp-cli --accept-tos status
-          curl -s https://www.cloudflare.com/cdn-cgi/trace
-
       - name: Run CGV Scraper
         env:
           ENV: production
