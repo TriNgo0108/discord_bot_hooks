@@ -54,11 +54,26 @@ jobs:
 
           # Restart and Connect
           sudo systemctl restart warp-svc
-          sleep 5
+          
+          # Wait for daemon to start and pick up MDM config
+          echo "Waiting for WARP daemon..."
+          sleep 10
+          
+          # Verify registration (MDM should handle this)
+          echo "Checking registration status..."
           warp-cli --accept-tos status
+          
+          # Connect
+          echo "Connecting..."
           warp-cli --accept-tos connect
-          sleep 5
-          curl https://www.cloudflare.com/cdn-cgi/trace
+          
+          # Wait for connection
+          sleep 10
+          
+          # Check connection status
+          echo "Verifying connection..."
+          warp-cli --accept-tos status
+          curl -s https://www.cloudflare.com/cdn-cgi/trace
 
       - name: Run CGV Scraper
         env:
