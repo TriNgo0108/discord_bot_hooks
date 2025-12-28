@@ -29,5 +29,6 @@ jobs:
         env:
           ENV: production
           DISCORD_WEBHOOK_CGV: ${{ secrets.DISCORD_WEBHOOK_CGV }}
+          SOCKS5_PROXY: ${{ secrets.SOCKS5_PROXY }}
         run: python src/cgv_scraper/main.py
 

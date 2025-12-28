@@ -50,6 +50,9 @@ USER_AGENT = os.getenv(
 VIEWPORT_WIDTH = int(os.getenv("VIEWPORT_WIDTH", "1280"))
 VIEWPORT_HEIGHT = int(os.getenv("VIEWPORT_HEIGHT", "720"))
 
+# Proxy Configuration
+SOCKS5_PROXY = os.getenv("SOCKS5_PROXY")
+
 
 def get_movies(url):
     """Scrape movie information from CGV website using Playwright."""
@@ -64,6 +67,11 @@ def get_movies(url):
                 "--disable-dev-shm-usage",
             ],
         }
+
+        # Add proxy configuration if set
+        if SOCKS5_PROXY:
+            logger.info("Using SOCKS5 proxy: %s", SOCKS5_PROXY)
+            launch_args["proxy"] = {"server": f"socks5://{SOCKS5_PROXY}"}
 
         logger.debug("Launching browser...")
         browser = playwright_instance.chromium.launch(**launch_args)
