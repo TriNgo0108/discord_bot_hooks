@@ -17,6 +17,43 @@ if os.getenv("ENV") != "production":
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_GMAIL")
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+
+def summarize_content(text):
+    """Summarize text using OpenRouter."""
+    if not OPENROUTER_API_KEY:
+        print("OPENROUTER_API_KEY not set. Skipping summarization.")
+        return None
+
+    try:
+        response = httpx.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "google/gemma-3-27b-it:free",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that summarizes emails. "
+                        "Keep the summary concise and focused on the key information. "
+                        "IMPORTANT: You MUST preserve all links from the original text in Markdown format [text](url). "
+                        "Do not use other markdown formatting (like italics/headings) other than bolding key terms.",
+                    },
+                    {"role": "user", "content": f"Summarize this email content:\n\n{text[:10000]}"},
+                ],
+            },
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        print(f"Summarization failed: {e}")
+        return None
 
 
 def decode_mime_header(header_value):
@@ -251,27 +288,27 @@ def fetch_recent_emails():
 
             # Extract links and images from HTML
             if html_content:
-                # Still extracting these for metadata if needed, but main body is markdown now
                 links = parse_html_links(html_content)
                 images = parse_html_images(html_content)
-
-                # Prefer HTML converted to Markdown, fall back to plain text
                 snippet = convert_html_to_markdown(html_content)
             elif snippet:
-                # If only plain text exists, clean it up
                 snippet = clean_text_content(snippet)
 
-            # Fallback if empty
             if not snippet:
                 snippet = "(No content)"
 
             print(f"DEBUG: Processing email '{subject[:30]}...' - Body len: {len(snippet)}")
 
+            # Summarize content
+            summary = summarize_content(snippet)
+            if summary:
+                snippet = summary
+
             emails.append(
                 {
                     "subject": subject,
                     "from": sender,
-                    "body_text": snippet,  # Full content, formatted
+                    "body_text": snippet,
                     "links": links,
                     "images": images,
                 }
