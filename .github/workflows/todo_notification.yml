@@ -1,0 +1,30 @@
+name: Daily Todo Notification
+
+on:
+  schedule:
+    # 01:00 UTC = 08:00 UTC+7 (Vietnam time)
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  todo-notification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r src/todo_notifier/requirements.txt
+
+      - name: Run Todo Notifier
+        env:
+          ENV: production
+          DB_URL: ${{ secrets.DB_URL }}
+          DISCORD_WEBHOOK_TODO: ${{ secrets.DISCORD_WEBHOOK_TODO }}
+        run: python src/todo_notifier/main.py
