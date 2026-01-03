@@ -1,0 +1,2 @@
+feedparser
+-r ../common/requirements.txt

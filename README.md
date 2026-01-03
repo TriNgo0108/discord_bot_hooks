@@ -7,15 +7,16 @@ This project contains daily automation scripts that trigger via GitHub Actions a
 1.  **Expense Report**: Summarizes daily expenses from a PostgreSQL database.
 2.  **CGV Scraper**: Checks "Now Showing" and "Coming Soon" movies on CGV Vietnam.
 3.  **Gmail Summary**: Fetches the last 10 Gmail messages.
+4.  **Financial News**: Fetches and aggregates financial news from Vietnam (CafeF, Vietstock) and Global (Yahoo, Investing.com) sources via RSS.
 
 ## Setup
 
 ### Prerequisites
 
--   Python 3.9+
--   PostgreSQL Database
--   Google Cloud Project (for Gmail)
--   Discord Server (for Webhooks)
+- Python 3.9+
+- PostgreSQL Database
+- Google Cloud Project (for Gmail)
+- Discord Server (for Webhooks)
 
 ### Installation
 
@@ -34,7 +35,9 @@ DB_URL=postgresql://user:password@host:port/dbname
 DISCORD_WEBHOOK_EXPENSE=your_webhook_url
 DISCORD_WEBHOOK_CGV=your_webhook_url
 DISCORD_WEBHOOK_GMAIL=your_webhook_url
+DISCORD_WEBHOOK_FINANCE=your_webhook_url
 GMAIL_TOKEN=base64_encoded_token_json_optional
+OPENROUTER_API_KEY=your_openrouter_api_key_optional
 ```
 
 ## Gmail Setup
@@ -53,20 +56,22 @@ To enable the Gmail reader, you need to generate a `token.json` file.
 7.  A `token.json` file will be created.
 
 **For GitHub Actions**:
--   Open `token.json`, copy the content.
--   Base64 encode it to avoid JSON parsing issues in secrets (though raw might work if quoted properly, base64 is safer).
--   Add it as a secret named `GMAIL_TOKEN`.
+
+- Open `token.json`, copy the content.
+- Base64 encode it to avoid JSON parsing issues in secrets (though raw might work if quoted properly, base64 is safer).
+- Add it as a secret named `GMAIL_TOKEN`.
 
 ## GitHub Secrets
 
 You must set the following secrets in your GitHub Repository settings:
 
-| Secret Name               | Description                                      |
-| ------------------------- | ------------------------------------------------ |
-| `DB_URL`                  | PostgreSQL Connection URL                        |
-| `DISCORD_WEBHOOK_EXPENSE` | Webhook for Expense Reports                      |
-| `DISCORD_WEBHOOK_CGV`     | Webhook for CGV Updates                          |
-| `DISCORD_WEBHOOK_GMAIL`   | Webhook for Gmail Summary                        |
-| `GMAIL_ADDRESS`           | Your Gmail email address                         |
-| `GMAIL_APP_PASSWORD`      | Gmail App Password (not your regular password)   |
-
+| Secret Name               | Description                                    |
+| ------------------------- | ---------------------------------------------- |
+| `DB_URL`                  | PostgreSQL Connection URL                      |
+| `DISCORD_WEBHOOK_EXPENSE` | Webhook for Expense Reports                    |
+| `DISCORD_WEBHOOK_CGV`     | Webhook for CGV Updates                        |
+| `DISCORD_WEBHOOK_GMAIL`   | Webhook for Gmail Summary                      |
+| `DISCORD_WEBHOOK_FINANCE` | Webhook for Financial News                     |
+| `OPENROUTER_API_KEY`      | API Key for AI Summarization (optional)        |
+| `GMAIL_ADDRESS`           | Your Gmail email address                       |
+| `GMAIL_APP_PASSWORD`      | Gmail App Password (not your regular password) |
