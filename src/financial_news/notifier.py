@@ -38,7 +38,7 @@ def send_discord_webhook(
                 if current_message == header:
                     pass
                 else:
-                    payload = {"username": "Financial News Bot", "content": current_message}
+                    payload = {"content": current_message}
                     _post_to_discord(webhook_url, payload)
 
         except Exception as e:
