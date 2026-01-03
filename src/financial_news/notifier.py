@@ -27,7 +27,7 @@ def send_discord_webhook(
             for part in parts:
                 if len(current_message) + len(part) + 1 > 1900:
                     # Send current bucket
-                    payload = {"username": "Financial News Bot", "content": current_message}
+                    payload = {"content": current_message}
                     _post_to_discord(webhook_url, payload)
                     current_message = part + "\n"
                 else:
@@ -63,7 +63,7 @@ def send_discord_webhook(
             }
             embeds.append(embed)
 
-        payload = {"username": "Financial News Bot", "embeds": embeds}
+        payload = {"embeds": embeds}
 
         try:
             _post_to_discord(webhook_url, payload)
