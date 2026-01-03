@@ -3,7 +3,7 @@ import logging
 import os
 from typing import Any
 
-import requests
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -48,13 +48,12 @@ class NewsSummarizer:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            # OpenRouter optional headers for rankings
-            # "HTTP-Referer": "https://github.com/TriNgo0108/discord_bot_hooks",
-            # "X-Title": "Discord Bot Hooks",
         }
 
         try:
-            response = requests.post(self.api_url, headers=headers, data=json.dumps(payload))
+            response = httpx.post(
+                self.api_url, headers=headers, content=json.dumps(payload), timeout=60.0
+            )
             response.raise_for_status()
             data = response.json()
 

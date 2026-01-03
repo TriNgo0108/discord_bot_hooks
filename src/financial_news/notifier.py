@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-import requests
+import httpx
 
 
 def send_discord_webhook(
@@ -37,8 +37,10 @@ def send_discord_webhook(
             payload["content"] = f"**Daily Financial Briefing**\n\n{summary}\n\n**Latest News:**"
 
         try:
-            response = requests.post(
-                webhook_url, data=json.dumps(payload), headers={"Content-Type": "application/json"}
+            response = httpx.post(
+                webhook_url,
+                content=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
         except Exception as e:
