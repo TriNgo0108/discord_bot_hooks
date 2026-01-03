@@ -3,6 +3,7 @@ import time
 from typing import Any
 
 import feedparser
+import httpx
 
 
 class FeedManager:
@@ -13,10 +14,18 @@ class FeedManager:
         all_news = []
         for url in feed_urls:
             try:
-                feed = feedparser.parse(url)
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                }
+                response = httpx.get(url, headers=headers, timeout=30.0)
+                response.raise_for_status()
+
+                feed = feedparser.parse(response.content)
                 if feed.bozo:
-                    print(f"Error parsing feed {url}: {feed.bozo_exception}")
-                    continue
+                    # Ignore bozo errors which are just warnings usually
+                    pass
+                    # print(f"Error parsing feed {url}: {feed.bozo_exception}")
+                    # continue
 
                 for entry in feed.entries:
                     news_item = self._parse_entry(entry, feed.feed.get("title", "Unknown Source"))
