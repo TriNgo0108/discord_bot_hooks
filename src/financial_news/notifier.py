@@ -17,20 +17,30 @@ def send_discord_webhook(
     # Send Summary First (if exists)
     if summary:
         try:
-            # Check length limit
-            if len(summary) > 1900:
-                summary = summary[:1900] + "...\n(Truncated)"
+            # Split summary into chunks of 1900 characters to be safe (Discord limit 2000)
+            # We split by newlines where possible to avoid breaking markdown
+            header = "**Daily Financial Briefing**\n\n"
+            current_message = header
 
-            payload = {
-                "username": "Financial News Bot",
-                "content": f"**Daily Financial Briefing**\n\n{summary}\n\n**Latest News:**",
-            }
-            response = httpx.post(
-                webhook_url,
-                content=json.dumps(payload),
-                headers={"Content-Type": "application/json"},
-            )
-            response.raise_for_status()
+            parts = summary.split("\n")
+
+            for part in parts:
+                if len(current_message) + len(part) + 1 > 1900:
+                    # Send current bucket
+                    payload = {"username": "Financial News Bot", "content": current_message}
+                    _post_to_discord(webhook_url, payload)
+                    current_message = part + "\n"
+                else:
+                    current_message += part + "\n"
+
+            # Send remaining
+            if current_message.strip():
+                if current_message == header:
+                    pass
+                else:
+                    payload = {"username": "Financial News Bot", "content": current_message}
+                    _post_to_discord(webhook_url, payload)
+
         except Exception as e:
             print(f"Failed to send summary: {e}")
 
@@ -56,11 +66,15 @@ def send_discord_webhook(
         payload = {"username": "Financial News Bot", "embeds": embeds}
 
         try:
-            response = httpx.post(
-                webhook_url,
-                content=json.dumps(payload),
-                headers={"Content-Type": "application/json"},
-            )
-            response.raise_for_status()
+            _post_to_discord(webhook_url, payload)
         except Exception as e:
             print(f"Failed to send webhook chunk {i}: {e}")
+
+
+def _post_to_discord(webhook_url: str, payload: dict[str, Any]) -> None:
+    response = httpx.post(
+        webhook_url,
+        content=json.dumps(payload),
+        headers={"Content-Type": "application/json"},
+    )
+    response.raise_for_status()

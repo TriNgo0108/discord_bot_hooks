@@ -4,6 +4,7 @@ from typing import Any
 
 import feedparser
 import httpx
+from bs4 import BeautifulSoup
 
 
 class FeedManager:
@@ -49,12 +50,13 @@ class FeedManager:
             else:
                 published_at = datetime.datetime.now()  # Fallback
 
+            raw_summary = entry.get("summary", "")
+            summary = self._clean_html(raw_summary)
+
             return {
                 "title": entry.get("title", "No Title"),
                 "link": entry.get("link", ""),
-                "summary": entry.get("summary", "")[:200] + "..."
-                if len(entry.get("summary", "")) > 200
-                else entry.get("summary", ""),
+                "summary": summary,
                 "source": source_name,
                 "published_at": published_at,
                 "id": entry.get("id", entry.get("link", "")),
@@ -62,3 +64,26 @@ class FeedManager:
         except Exception as e:
             print(f"Error parsing entry: {e}")
             return None
+
+    def _clean_html(self, html_content: str) -> str:
+        if not html_content:
+            return ""
+
+        try:
+            soup = BeautifulSoup(html_content, "html.parser")
+
+            # Remove images
+            for img in soup.find_all("img"):
+                img.decompose()
+
+            # Convert links to Markdown
+            for a in soup.find_all("a", href=True):
+                text = a.get_text(strip=True)
+                if text:
+                    a.replace_with(f"[{text}]({a['href']})")
+
+            # Get text and clean up whitespace
+            text = soup.get_text(separator=" ", strip=True)
+            return text
+        except Exception:
+            return html_content
