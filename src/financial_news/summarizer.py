@@ -2,7 +2,7 @@ import logging
 import os
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 class NewsSummarizer:
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
+        self.client = genai.Client(api_key=self.api_key) if self.api_key else None
         self.model_name = "gemini-3-flash-preview"
 
     def summarize(
@@ -65,10 +66,11 @@ class NewsSummarizer:
         )
 
         try:
-            genai.configure(api_key=self.api_key)
-            model = genai.GenerativeModel(self.model_name)
+            if not self.client:
+                logger.warning("Client not initialized. Skipping.")
+                return ""
 
-            response = model.generate_content(prompt)
+            response = self.client.models.generate_content(model=self.model_name, contents=prompt)
             return response.text.strip()
 
         except Exception as e:

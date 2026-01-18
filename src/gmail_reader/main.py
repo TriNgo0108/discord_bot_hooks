@@ -6,8 +6,8 @@ import os
 import re
 from email.header import decode_header
 
-import google.generativeai as genai
 import httpx
+from google import genai
 
 # Only load .env for local development
 if os.getenv("ENV") != "production":
@@ -28,8 +28,7 @@ def summarize_content(text):
         return None
 
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-3-flash-preview")
+        client = genai.Client(api_key=GEMINI_API_KEY)
 
         prompt = (
             "You are a helpful assistant that summarizes emails. "
@@ -39,7 +38,7 @@ def summarize_content(text):
             f"Summarize this email content:\n\n{text[:10000]}"
         )
 
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(model="gemini-2.0-flash-exp", contents=prompt)
         return response.text.strip()
     except Exception as e:
         print(f"Summarization failed: {e}")
