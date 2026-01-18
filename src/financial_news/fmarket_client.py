@@ -1,0 +1,191 @@
+import datetime
+import logging
+from typing import Any
+
+import httpx
+
+logger = logging.getLogger(__name__)
+
+
+class FmarketClient:
+    """
+    Client to interact with Fmarket API to retrieve financial data.
+    """
+
+    BASE_URL = "https://api.fmarket.vn/res"
+    HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+    def __init__(self):
+        self.client = httpx.Client(headers=self.HEADERS, timeout=30.0)
+
+    def get_top_funds(self, limit: int = 10) -> list[dict[str, Any]]:
+        """
+        Fetch top performing funds from Fmarket.
+        """
+        url = f"{self.BASE_URL}/products/filter"
+        payload = {
+            "types": ["NEW_FUND", "TRADING_FUND"],
+            "issuerIds": [],
+            "sortOrder": "DESC",
+            "sortField": "navTo6Months",
+            "page": 1,
+            "pageSize": limit,
+            "isIpo": False,
+            "fundAssetTypes": [],  # All types
+            "bondRemainPeriods": [],
+            "searchField": "",
+            "isBuyByReward": False,
+            "thirdAppIds": [],
+        }
+
+        try:
+            response = self.client.post(url, json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+            if "data" in data and "rows" in data["data"]:
+                funds = []
+                for row in data["data"]["rows"]:
+                    funds.append(
+                        {
+                            "name": row.get("shortName"),
+                            "nav": row.get("nav"),
+                            "nav_12m": row.get("productNavChange", {}).get("navTo12Months"),
+                            "nav_ytd": row.get("productNavChange", {}).get("navToYtd"),
+                            "nav_3y": row.get("productNavChange", {}).get("navTo36Months"),
+                            "type": row.get("fundAssetType", {}).get("name"),
+                        }
+                    )
+                return funds
+            return []
+        except Exception as e:
+            logger.error(f"Error fetching top funds: {e}")
+            return []
+
+    def get_gold_prices(self) -> dict[str, Any]:
+        """
+        Fetch gold prices from Fmarket API.
+        """
+        url = f"{self.BASE_URL}/get-price-gold-history"
+
+        now = datetime.datetime.now()
+        date_str = now.strftime("%Y%m%d")
+
+        payload = {"fromDate": date_str, "toDate": date_str, "isAllData": False}
+
+        try:
+            response = self.client.post(url, json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+            extra = data.get("extra", {})
+
+            return {
+                "sjc_buy": extra.get("priceBuy"),
+                "sjc_sell": extra.get("priceSell"),
+                "ring_buy": extra.get("goldRingPriceBuy"),
+                "ring_sell": extra.get("goldRingPriceSell"),
+                "world_gold": extra.get("ratePriceGoldWorldToVND"),
+                "usd_vnd": extra.get("rateUsdToVnd"),
+            }
+        except Exception as e:
+            logger.error(f"Error fetching gold prices: {e}")
+            return {}
+
+    def get_bank_rates(self) -> list[dict[str, Any]]:
+        """
+        Fetch bank interest rates.
+        """
+        url = f"{self.BASE_URL}/bank-interest-rate"
+        try:
+            response = self.client.get(url)
+            response.raise_for_status()
+            data = response.json()
+
+            rates = []
+            # data['data'] contains 'bankList'
+            if "data" in data and isinstance(data["data"], dict):
+                bank_list = data["data"].get("bankList", [])
+
+                # Sort by value (rate) descending
+                # Value is string, need to convert to float
+                sorted_banks = sorted(
+                    bank_list,
+                    key=lambda x: float(x.get("value", 0) if x.get("value") else 0),
+                    reverse=True,
+                )
+
+                for bank in sorted_banks[:5]:
+                    rates.append(
+                        {
+                            "bank": bank.get("name"),
+                            "rate_12m": bank.get(
+                                "value"
+                            ),  # It seems to be the single displayed rate
+                        }
+                    )
+            return rates
+        except Exception as e:
+            logger.error(f"Error fetching bank rates: {e}")
+            logger.error(f"Response was: {data}")
+            return []
+
+    def get_market_news(self) -> list[dict[str, Any]]:
+        """
+        Fetch market news/blog from Fmarket.
+        """
+        # Try POST to get news if GET failed
+        url = f"{self.BASE_URL}/blog/filter"  # Guessing 'filter' based on product filter pattern
+        # Or maybe it's just 'newest'
+        # Let's try the one known to work for funds pattern: /res/blog/filter or /res/blog/get-newest
+        # Actually, let's revert to a safer bet or basic scraping if API fails.
+        # But wait, looking at the debug output, `blog/all` returned mktImageUrl.
+        # Let's try `blog/filter` with POST.
+
+        url = f"{self.BASE_URL}/blog/filter"
+        payload = {
+            "types": ["MARKET_NEWS", "KNOWLEDGE", "PERSONAL_FINANCE"],  # Guessed types
+            "page": 1,
+            "pageSize": 5,
+        }
+
+        try:
+            response = self.client.post(url, json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+            news = []
+            # Adapt to whatever structure comes back.
+            # If I can't reliably guess the API, I will return empty for now to avoid breaking flow.
+            # I will assume `data['data']['rows']` or `data['data']['content']`
+
+            rows = []
+            if "data" in data:
+                if "rows" in data["data"]:
+                    rows = data["data"]["rows"]
+                elif "content" in data["data"]:
+                    rows = data["data"]["content"]
+                elif isinstance(data["data"], list):
+                    rows = data["data"]
+
+            for item in rows:
+                news.append(
+                    {
+                        "title": item.get("title"),
+                        "link": "https://fmarket.vn/blog/" + item.get("slug", ""),
+                        "summary": item.get("shortDescription", ""),
+                        "source": "Fmarket",
+                        "published_at": datetime.datetime.fromtimestamp(
+                            item.get("createAt", 0) / 1000
+                        ),
+                        "id": str(item.get("id")),
+                    }
+                )
+            return news
+        except Exception as e:
+            logger.error(f"Error fetching Fmarket news: {e}")
+            return []

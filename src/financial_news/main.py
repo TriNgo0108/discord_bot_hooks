@@ -2,6 +2,8 @@ import logging
 import os
 
 from .feed_manager import FeedManager
+from .fmarket_client import FmarketClient
+from .news_enricher import NewsEnricher
 from .notifier import send_discord_webhook
 from .summarizer import NewsSummarizer
 
@@ -32,6 +34,7 @@ def main():
     logger.info("Starting Financial News Fetcher...")
 
     feed_manager = FeedManager()
+    fmarket_client = FmarketClient()
 
     # Fetch Vietnam News
     vn_news = feed_manager.fetch_feeds(VIETNAM_FEED_URLS)
@@ -41,25 +44,38 @@ def main():
     global_news = feed_manager.fetch_feeds(GLOBAL_FEED_URLS)
     logger.info(f"Fetched {len(global_news)} Global news items.")
 
-    # Combine and Sort (Optional: could keep separate or filter by keywords)
-    # For now, let's just take the top 3 from each to send daily/hourly
-    # Or maybe filter by time (last 24h) if running daily.
+    # Fetch Fmarket News
+    fmarket_news = fmarket_client.get_market_news()
+    logger.info(f"Fetched {len(fmarket_news)} Fmarket news items.")
 
-    # Let's assume this runs periodically and we want the absolute latest.
-    # A simple strategy is sending the top 5 distinct items from combined list.
+    # Fetch Market Data
+    top_funds = fmarket_client.get_top_funds(limit=10)
+    gold_prices = fmarket_client.get_gold_prices()
+    bank_rates = fmarket_client.get_bank_rates()
 
-    combined_news = vn_news[:5] + global_news[:5]
+    # Combine News
+    combined_news = fmarket_news + vn_news[:5] + global_news[:5]
 
     if not combined_news:
         logger.info("No news found.")
         return
+
+    # Enrich News (Top 3 items)
+    logger.info("Enriching top news with Web Context...")
+    enricher = NewsEnricher()
+    # Prioritize enriching the most critical or diverse items if possible,
+    # but for now, just the top 3 of the combined list.
+    combined_news = enricher.enrich_news_items(combined_news, limit=3)
 
     logger.info(f"Sending {len(combined_news)} items to Discord...")
 
     # Generate Summary
     logger.info("Generating AI Summary...")
     summarizer = NewsSummarizer()
-    summary_text = summarizer.summarize(combined_news)
+
+    market_stats = {"top_funds": top_funds, "gold_prices": gold_prices, "bank_rates": bank_rates}
+
+    summary_text = summarizer.summarize(combined_news, market_stats)
 
     send_discord_webhook(webhook_url, combined_news, summary_text)
     logger.info("Done.")
