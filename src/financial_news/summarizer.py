@@ -1,24 +1,22 @@
-import json
 import logging
 import os
 from typing import Any
 
-import httpx
+import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
 
 class NewsSummarizer:
     def __init__(self):
-        self.api_key = os.getenv("OPENROUTER_API_KEY")
-        self.model = "google/gemma-3-27b-it:free"
-        self.api_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.api_key = os.getenv("GEMINI_API_KEY")
+        self.model_name = "gemini-3-flash-preview"
 
     def summarize(
         self, news_items: list[dict[str, Any]], market_stats: dict[str, Any] = None
     ) -> str:
         if not self.api_key:
-            logger.warning("OPENROUTER_API_KEY not found. Skipping summarization.")
+            logger.warning("GEMINI_API_KEY not found. Skipping summarization.")
             return ""
 
         if not news_items:
@@ -66,31 +64,12 @@ class NewsSummarizer:
             f"--- News ---\n{news_text}"
         )
 
-        payload = {
-            "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
-            "top_p": 1,
-            "temperature": 0.7,
-            "repetition_penalty": 1,
-        }
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-
         try:
-            response = httpx.post(
-                self.api_url, headers=headers, content=json.dumps(payload), timeout=60.0
-            )
-            response.raise_for_status()
-            data = response.json()
+            genai.configure(api_key=self.api_key)
+            model = genai.GenerativeModel(self.model_name)
 
-            if "choices" in data and len(data["choices"]) > 0:
-                return data["choices"][0]["message"]["content"]
-            else:
-                logger.error(f"Unexpected API response: {data}")
-                return ""
+            response = model.generate_content(prompt)
+            return response.text.strip()
 
         except Exception as e:
             logger.error(f"Failed to generate summary: {e}")

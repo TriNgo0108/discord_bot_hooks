@@ -6,6 +6,7 @@ import os
 import re
 from email.header import decode_header
 
+import google.generativeai as genai
 import httpx
 
 # Only load .env for local development
@@ -17,40 +18,29 @@ if os.getenv("ENV") != "production":
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_GMAIL")
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 
 def summarize_content(text):
-    """Summarize text using OpenRouter."""
-    if not OPENROUTER_API_KEY:
-        print("OPENROUTER_API_KEY not set. Skipping summarization.")
+    """Summarize text using Gemini 2.0 Flash."""
+    if not GEMINI_API_KEY:
+        print("GEMINI_API_KEY not set. Skipping summarization.")
         return None
 
     try:
-        response = httpx.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "google/gemma-3-27b-it:free",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant that summarizes emails. "
-                        "Keep the summary concise and focused on the key information. "
-                        "IMPORTANT: You MUST preserve all links from the original text in Markdown format [text](url). "
-                        "Do not use other markdown formatting (like italics/headings) other than bolding key terms.",
-                    },
-                    {"role": "user", "content": f"Summarize this email content:\n\n{text[:10000]}"},
-                ],
-            },
-            timeout=30.0,
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-3-flash-preview")
+
+        prompt = (
+            "You are a helpful assistant that summarizes emails. "
+            "Keep the summary concise and focused on the key information. "
+            "IMPORTANT: You MUST preserve all links from the original text in Markdown format [text](url). "
+            "Do not use other markdown formatting (like italics/headings) other than bolding key terms.\n\n"
+            f"Summarize this email content:\n\n{text[:10000]}"
         )
-        response.raise_for_status()
-        data = response.json()
-        return data["choices"][0]["message"]["content"].strip()
+
+        response = model.generate_content(prompt)
+        return response.text.strip()
     except Exception as e:
         print(f"Summarization failed: {e}")
         return None

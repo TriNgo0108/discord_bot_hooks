@@ -26,7 +26,7 @@ jobs:
       - name: Run Financial News Scraper
         env:
           DISCORD_WEBHOOK_FINANCE: ${{ secrets.DISCORD_WEBHOOK_FINANCE }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           WEBSEARCH_API_KEY: ${{ secrets.WEBSEARCH_API_KEY }}
         run: |
           python -m src.financial_news.main

@@ -37,7 +37,7 @@ DISCORD_WEBHOOK_CGV=your_webhook_url
 DISCORD_WEBHOOK_GMAIL=your_webhook_url
 DISCORD_WEBHOOK_FINANCE=your_webhook_url
 GMAIL_TOKEN=base64_encoded_token_json_optional
-OPENROUTER_API_KEY=your_openrouter_api_key_optional
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
 ## Gmail Setup
@@ -72,6 +72,6 @@ You must set the following secrets in your GitHub Repository settings:
 | `DISCORD_WEBHOOK_CGV`     | Webhook for CGV Updates                        |
 | `DISCORD_WEBHOOK_GMAIL`   | Webhook for Gmail Summary                      |
 | `DISCORD_WEBHOOK_FINANCE` | Webhook for Financial News                     |
-| `OPENROUTER_API_KEY`      | API Key for AI Summarization (optional)        |
+| `GEMINI_API_KEY`          | API Key for AI Summarization (Google Gemini)   |
 | `GMAIL_ADDRESS`           | Your Gmail email address                       |
 | `GMAIL_APP_PASSWORD`      | Gmail App Password (not your regular password) |
