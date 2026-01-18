@@ -27,5 +27,6 @@ jobs:
         env:
           DISCORD_WEBHOOK_FINANCE: ${{ secrets.DISCORD_WEBHOOK_FINANCE }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          WEBSEARCH_API_KEY: ${{ secrets.WEBSEARCH_API_KEY }}
         run: |
           python -m src.financial_news.main
