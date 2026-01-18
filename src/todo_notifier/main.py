@@ -28,7 +28,7 @@ def fetch_incomplete_todos():
 
     # Query todo_read_model for incomplete items
     query = """
-        SELECT content, priority, created_at
+        SELECT id, content, priority, created_at
         FROM public.todo_read_model
         WHERE completed = false
         ORDER BY 
@@ -57,8 +57,8 @@ def format_todo_message(rows):
     total_count = len(rows)
     todos_by_priority = defaultdict(list)
 
-    for content, priority, _ in rows:
-        todos_by_priority[priority].append(content)
+    for todo_id, content, priority, _ in rows:
+        todos_by_priority[priority].append((todo_id, content))
 
     today_date = datetime.date.today().strftime("%Y-%m-%d")
     message = f"**Pending Todos** 📝 ({today_date})\n"
@@ -70,16 +70,16 @@ def format_todo_message(rows):
     for priority in priorities:
         if priority in todos_by_priority:
             message += f"**{priority} Priority**\n"
-            for todo in todos_by_priority[priority]:
-                message += f"☐ {todo}\n"
+            for todo_id, content in todos_by_priority[priority]:
+                message += f"☐ `[{todo_id}]` {content}\n"
             message += "\n"
 
     # Handle any other priorities if they exist
     for priority, todo_list in todos_by_priority.items():
         if priority not in priorities:
             message += f"**{priority} Priority**\n"
-            for todo in todo_list:
-                message += f"☐ {todo}\n"
+            for todo_id, content in todo_list:
+                message += f"☐ `[{todo_id}]` {content}\n"
             message += "\n"
 
     return message.strip()

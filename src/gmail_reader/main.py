@@ -78,7 +78,7 @@ def parse_html_links(html_content):
     link_pattern = r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>([^<]*)</a>'
     matches = re.findall(link_pattern, html_content, re.IGNORECASE)
 
-    # Noise terms for links
+    # Noise terms for links (text-based)
     skip_terms = [
         "unsubscribe",
         "preference",
@@ -88,9 +88,55 @@ def parse_html_links(html_content):
         "manage subscription",
     ]
 
+    # Tracking URL patterns to filter out
+    tracking_patterns = [
+        # Email service providers / Marketing platforms
+        "click.mailchimp.com",
+        "links.email.",
+        "track.customer.io",
+        "tracking.",
+        "t.dripemail2.com",
+        "email.mg.",
+        "link.mail.",
+        "trk.klclick.com",
+        "clicks.beehiiv.com",
+        "open.substack.com",
+        "email.substack.com",
+        "mailtrack.",
+        "t.sidekickopen",
+        "mandrillapp.com/track",
+        "list-manage.com/track",
+        # Analytics / Tracking services
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "/track/click",
+        "/track/open",
+        "trk=",
+        "mc_cid=",
+        "mc_eid=",
+        # Generic tracking patterns
+        "redirect.",
+        "/r/",  # Common redirect pattern
+        "click.",
+        "go.link",
+        "links.e.",
+        "elink.",
+        "t.co/",  # Twitter shortener often used for tracking
+        "bit.ly/",
+        # Social / Confirmation / Utility
+        "confirm",
+        "verify",
+    ]
+
     for url, text in matches:
         text = text.strip()
         if url and not url.startswith("mailto:"):
+            # Filter out tracking URLs
+            url_lower = url.lower()
+            if any(pattern in url_lower for pattern in tracking_patterns):
+                continue
+
             # Clean up the text
             text = re.sub(r"\s+", " ", text)
 
@@ -100,7 +146,7 @@ def parse_html_links(html_content):
                 domain_match = re.search(r"https?://(?:www\.)?([^/]+)", url)
                 text = domain_match.group(1) if domain_match else "Link"
 
-            # Filter out noise links
+            # Filter out noise links (by text)
             if any(term in text.lower() for term in skip_terms):
                 continue
 
