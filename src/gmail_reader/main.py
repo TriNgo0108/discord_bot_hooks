@@ -4,16 +4,11 @@ import html
 import imaplib
 import os
 import re
+import time
 from email.header import decode_header
 
 import httpx
 from google import genai
-
-# Only load .env for local development
-if os.getenv("ENV") != "production":
-    from dotenv import load_dotenv
-
-    load_dotenv()
 
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_GMAIL")
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
@@ -21,28 +16,49 @@ GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 
-def summarize_content(text):
-    """Summarize text using Gemini 2.0 Flash."""
-    if not GEMINI_API_KEY:
-        print("GEMINI_API_KEY not set. Skipping summarization.")
-        return None
-
+_gemini_client = None
+if GEMINI_API_KEY:
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-
-        prompt = (
-            "You are a helpful assistant that summarizes emails. "
-            "Keep the summary concise and focused on the key information. "
-            "IMPORTANT: You MUST preserve all links from the original text in Markdown format [text](url). "
-            "Do not use other markdown formatting (like italics/headings) other than bolding key terms.\n\n"
-            f"Summarize this email content:\n\n{text[:10000]}"
-        )
-
-        response = client.models.generate_content(model="gemini-2.0-flash-exp", contents=prompt)
-        return response.text.strip()
+        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
     except Exception as e:
-        print(f"Summarization failed: {e}")
+        print(f"Failed to initialize Gemini client: {e}")
+
+
+def summarize_content(text):
+    """Summarize text using Gemini 2.0 Flash with retry logic."""
+    if not _gemini_client:
+        print("Gemini client not initialized. Skipping summarization.")
         return None
+
+    prompt = (
+        "You are an expert email summarizer. Your goal is to provide a clear, concise, and actionable summary of the email content.\n\n"
+        "GUIDELINES:\n"
+        "1. **Content**: Focus on the main points, deadlines, and action items. Eliminate fluff.\n"
+        "2. **Links**: You MUST preserve all important links from the original text. Format them as Markdown: [link text](url).\n"
+        "3. **Formatting**: Use bullet points for readability. Bold key terms (dates, names, critical info).\n"
+        "4. **Length**: Keep the summary efficient but don't lose critical context.\n\n"
+        f"EMAIL CONTENT:\n{text}"
+    )
+
+    max_retries = 3
+    base_delay = 2
+
+    for attempt in range(max_retries):
+        try:
+            response = _gemini_client.models.generate_content(
+                model="gemini-2.5-flash-lite", contents=prompt
+            )
+            return response.text.strip()
+
+        except Exception as e:
+            if attempt == max_retries - 1:
+                print(f"Summarization failed after {max_retries} attempts: {e}")
+                return None
+
+            print(f"Summarization attempt {attempt + 1} failed: {e}. Retrying...")
+            time.sleep(base_delay * (attempt + 1))  # Simple linear backoff
+
+    return None
 
 
 def decode_mime_header(header_value):
