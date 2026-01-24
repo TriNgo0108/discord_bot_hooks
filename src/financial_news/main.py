@@ -49,7 +49,7 @@ def main():
     logger.info(f"Fetched {len(fmarket_news)} Fmarket news items.")
 
     # Fetch Market Data
-    top_funds = fmarket_client.get_top_funds(limit=10)
+    top_funds = fmarket_client.get_top_funds(limit=5, include_holdings=True)
     gold_prices = fmarket_client.get_gold_prices()
     bank_rates = fmarket_client.get_bank_rates()
 

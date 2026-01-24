@@ -34,12 +34,18 @@ class NewsSummarizer:
         funds_text = ""
         if "top_funds" in market_stats:
             funds = market_stats["top_funds"]
-            funds_text = "\nTop Funds:\n" + "\n".join(
-                [
-                    f"- {f['name']} ({f['type']}): 1Y {f['nav_12m']}%, YTD {f['nav_ytd']}%, 3Y {f['nav_3y']}%"
-                    for f in funds
-                ]
-            )
+            fund_lines = []
+            for f in funds:
+                fund_line = f"- {f['name']} ({f.get('type', 'N/A')}): 6M {f.get('nav_6m', 0):.1f}%, 1Y {f.get('nav_12m', 0):.1f}%"
+                # Add top holdings if available
+                if "top_holdings" in f and f["top_holdings"]:
+                    top_3 = f["top_holdings"][:3]
+                    holdings_str = ", ".join(
+                        [f"{h['stock_code']} ({h.get('portfolio_weight', 0):.1f}%)" for h in top_3]
+                    )
+                    fund_line += f" | Top: {holdings_str}"
+                fund_lines.append(fund_line)
+            funds_text = "\nTop Funds:\n" + "\n".join(fund_lines)
 
         gold_text = ""
         if "gold_prices" in market_stats and market_stats["gold_prices"]:

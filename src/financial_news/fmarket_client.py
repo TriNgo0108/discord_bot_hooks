@@ -22,9 +22,87 @@ class FmarketClient:
     def __init__(self):
         self.client = httpx.Client(headers=self.HEADERS, timeout=30.0)
 
-    def get_top_funds(self, limit: int = 10) -> list[dict[str, Any]]:
+    def get_fund_detail(self, product_id: int) -> dict[str, Any]:
+        """
+        Fetch detailed fund information including top holdings.
+
+        Args:
+            product_id: The fund product ID.
+
+        Returns:
+            Dictionary with fund details including top_holdings, asset_allocation,
+            and industry_allocation.
+        """
+        url = f"{self.BASE_URL}/products/{product_id}"
+
+        try:
+            response = self.client.get(url)
+            response.raise_for_status()
+            data = response.json()
+
+            if "data" not in data:
+                return {}
+
+            product = data["data"]
+
+            # Extract top holdings
+            top_holdings = []
+            for holding in product.get("productTopHoldingList", []):
+                top_holdings.append(
+                    {
+                        "stock_code": holding.get("stockCode"),
+                        "price": holding.get("price"),
+                        "change_percent": holding.get("changeFromPreviousPercent"),
+                        "portfolio_weight": holding.get("netAssetPercent"),
+                        "industry": holding.get("industry"),
+                    }
+                )
+
+            # Extract asset allocation
+            asset_allocation = []
+            for asset in product.get("productAssetHoldingList", []):
+                asset_type = asset.get("assetType", {})
+                asset_allocation.append(
+                    {
+                        "type": asset_type.get("name"),
+                        "percent": asset.get("assetPercent"),
+                    }
+                )
+
+            # Extract industry allocation
+            industry_allocation = []
+            for industry in product.get("productIndustriesHoldingList", []):
+                industry_allocation.append(
+                    {
+                        "industry": industry.get("industry"),
+                        "percent": industry.get("assetPercent"),
+                    }
+                )
+
+            return {
+                "id": product.get("id"),
+                "name": product.get("shortName"),
+                "full_name": product.get("name"),
+                "nav": product.get("nav"),
+                "description": product.get("description"),
+                "top_holdings": top_holdings,
+                "asset_allocation": asset_allocation,
+                "industry_allocation": industry_allocation,
+            }
+
+        except Exception as e:
+            logger.error(f"Error fetching fund detail for product {product_id}: {e}")
+            return {}
+
+    def get_top_funds(
+        self, limit: int = 10, include_holdings: bool = False
+    ) -> list[dict[str, Any]]:
         """
         Fetch top performing funds from Fmarket.
+
+        Args:
+            limit: Maximum number of funds to return.
+            include_holdings: If True, fetch detailed holdings for each fund.
         """
         url = f"{self.BASE_URL}/products/filter"
         payload = {
@@ -50,16 +128,33 @@ class FmarketClient:
             if "data" in data and "rows" in data["data"]:
                 funds = []
                 for row in data["data"]["rows"]:
-                    funds.append(
-                        {
-                            "name": row.get("shortName"),
-                            "nav": row.get("nav"),
-                            "nav_12m": row.get("productNavChange", {}).get("navTo12Months"),
-                            "nav_ytd": row.get("productNavChange", {}).get("navToYtd"),
-                            "nav_3y": row.get("productNavChange", {}).get("navTo36Months"),
-                            "type": row.get("fundAssetType", {}).get("name"),
-                        }
-                    )
+                    # Get fund type from available fields
+                    fund_type = None
+                    if row.get("fundAssetType"):
+                        fund_type = row["fundAssetType"].get("name")
+                    elif row.get("dataFundAssetType"):
+                        fund_type = row["dataFundAssetType"].get("name")
+
+                    fund_data = {
+                        "id": row.get("id"),
+                        "name": row.get("shortName"),
+                        "nav": row.get("nav"),
+                        "nav_12m": row.get("productNavChange", {}).get("navTo12Months"),
+                        "nav_ytd": row.get("productNavChange", {}).get("navToLastYear"),
+                        "nav_6m": row.get("productNavChange", {}).get("navTo6Months"),
+                        "nav_3y": row.get("productNavChange", {}).get("navTo36Months"),
+                        "type": fund_type,
+                    }
+
+                    # Optionally fetch detailed holdings
+                    if include_holdings and row.get("id"):
+                        detail = self.get_fund_detail(row["id"])
+                        if detail:
+                            fund_data["top_holdings"] = detail.get("top_holdings", [])
+                            fund_data["asset_allocation"] = detail.get("asset_allocation", [])
+                            fund_data["industry_allocation"] = detail.get("industry_allocation", [])
+
+                    funds.append(fund_data)
                 return funds
             return []
         except Exception as e:
