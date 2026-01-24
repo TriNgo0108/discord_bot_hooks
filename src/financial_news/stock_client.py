@@ -1,5 +1,5 @@
 """
-Stock client for fetching Vietnam stock prices using vnstock library.
+Stock client for fetching Vietnam stock prices using DSC Securities API.
 """
 
 import datetime
@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from vnstock import Listing, Vnstock
+from .dsc_client import DSCClient
 
 logger = logging.getLogger(__name__)
 
@@ -42,22 +42,22 @@ class StockInfo:
 
 class StockClient:
     """
-    Client to fetch Vietnam stock prices from vnstock library.
-    Uses VCI source for reliable daily data.
+    Client to fetch Vietnam stock prices from DSC Securities API.
+    Provides real-time data without rate limits.
     """
 
     def __init__(self, source: str = "VCI"):
         self.source = source
         self._vn30_cache: set[str] | None = None
+        self.dsc_client = DSCClient()
 
     def get_vn30_symbols(self) -> set[str]:
         """Get list of VN30 index component symbols."""
         if self._vn30_cache is None:
             try:
-                listing = Listing()
-                vn30_series = listing.symbols_by_group(group="VN30")
-                self._vn30_cache = set(vn30_series.tolist())
-                logger.info(f"Loaded {len(self._vn30_cache)} VN30 symbols")
+                symbols = self.dsc_client.get_vn30_symbols()
+                self._vn30_cache = set(symbols)
+                logger.info(f"Loaded {len(self._vn30_cache)} VN30 symbols from DSC")
             except Exception as e:
                 logger.error(f"Error fetching VN30 symbols: {e}")
                 self._vn30_cache = set()
@@ -69,77 +69,32 @@ class StockClient:
 
     def get_stock_info(self, symbol: str) -> StockInfo | None:
         """
-        Fetch company fundamentals and financial ratios.
-
-        Args:
-            symbol: Stock symbol (e.g., 'FPT', 'VIC')
-
-        Returns:
-            StockInfo with company name, industry, P/E, P/B, ROE, etc.
+        Fetch company fundamentals via DSC (limited info compared to vnstock).
         """
         try:
-            stock = Vnstock().stock(symbol=symbol, source=self.source)
-
-            # Get company overview
-            company_name = ""
-            industry = ""
-            exchange = ""
-            try:
-                overview = stock.company.overview()
-                if hasattr(overview, "iloc") and len(overview) > 0:
-                    row = overview.iloc[0]
-                    company_name = str(row.get("short_name", row.get("company_name", "")))
-                    industry = str(row.get("industry", ""))
-                    exchange = str(row.get("exchange", ""))
-            except Exception as e:
-                logger.debug(f"Company overview error for {symbol}: {e}")
-
-            # Get financial ratios
-            pe_ratio = 0.0
-            pb_ratio = 0.0
-            eps = 0.0
-            roe = 0.0
-            market_cap = 0.0
-            try:
-                ratios = stock.finance.ratio(period="year", lang="en")
-                if hasattr(ratios, "iloc") and len(ratios) > 0:
-                    latest = ratios.iloc[-1]
-                    # Search in multi-level columns
-                    for col in ratios.columns:
-                        col_name = col[1] if isinstance(col, tuple) else col
-                        if col_name == "P/E":
-                            pe_ratio = float(latest[col]) if latest[col] else 0.0
-                        elif col_name == "P/B":
-                            pb_ratio = float(latest[col]) if latest[col] else 0.0
-                        elif col_name == "EPS (VND)":
-                            eps = float(latest[col]) if latest[col] else 0.0
-                        elif col_name == "ROE (%)":
-                            roe = float(latest[col]) * 100 if latest[col] else 0.0
-                        elif "Market Capital" in str(col_name):
-                            market_cap = float(latest[col]) / 1e9 if latest[col] else 0.0
-            except Exception as e:
-                logger.debug(f"Financial ratios error for {symbol}: {e}")
+            info = self.dsc_client.get_stock_info(symbol)
+            if not info:
+                return None
 
             return StockInfo(
-                symbol=symbol,
-                company_name=company_name,
-                industry=industry,
-                exchange=exchange,
-                market_cap=market_cap,
-                pe_ratio=round(pe_ratio, 2),
-                pb_ratio=round(pb_ratio, 2),
-                eps=round(eps, 2),
-                roe=round(roe, 2),
+                symbol=info.get("symbol", symbol),
+                company_name=info.get("company_name", ""),
+                industry=info.get("industry", ""),
+                exchange=info.get("exchange", ""),
+                market_cap=info.get("market_cap", 0.0),
+                pe_ratio=0.0,
+                pb_ratio=0.0,
+                eps=0.0,
+                roe=0.0,
                 is_vn30=self.is_vn30(symbol),
             )
-
         except Exception as e:
             logger.error(f"Error fetching stock info for {symbol}: {e}")
             return None
 
     def get_stock_price(self, symbol: str) -> StockPrice | None:
         """
-        Fetch current price data for a single stock.
+        Fetch current price data for a single stock using DSC Client (No rate limit).
 
         Args:
             symbol: Stock symbol (e.g., 'FPT', 'VIC', 'MWG')
@@ -148,43 +103,24 @@ class StockClient:
             StockPrice object with price, change, and volume data.
         """
         try:
-            stock = Vnstock().stock(symbol=symbol, source=self.source)
-
-            # Get last 2 trading days to calculate change
-            end_date = datetime.datetime.now().strftime("%Y-%m-%d")
-            start_date = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
-
-            hist = stock.quote.history(symbol=symbol, start=start_date, end=end_date)
-
-            if hist is None or len(hist) < 2:
-                logger.warning(f"Not enough data for {symbol}")
-                return None
-
-            # Get last two rows for change calculation
-            prev = hist.iloc[-2]
-            curr = hist.iloc[-1]
-
-            prev_close = float(prev["close"])
-            curr_close = float(curr["close"])
-            change = curr_close - prev_close
-            change_pct = (change / prev_close) * 100 if prev_close > 0 else 0.0
-
-            return StockPrice(
-                symbol=symbol,
-                price=curr_close,
-                change=change,
-                change_percent=round(change_pct, 2),
-                volume=int(curr["volume"]),
-                date=str(curr["time"]),
-            )
-
+            stock_data = self.dsc_client.get_stock_price(symbol)
+            if stock_data:
+                return StockPrice(
+                    symbol=stock_data.symbol,
+                    price=stock_data.price,
+                    change=stock_data.change,
+                    change_percent=stock_data.change_percent,
+                    volume=stock_data.volume,
+                    date=stock_data.last_update or datetime.datetime.now().strftime("%H:%M:%S"),
+                )
+            return None
         except Exception as e:
             logger.error(f"Error fetching price for {symbol}: {e}")
             return None
 
     def get_stock_prices(self, symbols: list[str]) -> dict[str, StockPrice]:
         """
-        Fetch prices for multiple stocks.
+        Fetch prices for multiple stocks using DSC Client (Efficient).
 
         Args:
             symbols: List of stock symbols
@@ -192,12 +128,22 @@ class StockClient:
         Returns:
             Dictionary mapping symbol to StockPrice object.
         """
-        prices = {}
-        for symbol in symbols:
-            price = self.get_stock_price(symbol)
-            if price:
-                prices[symbol] = price
-        return prices
+        try:
+            dsc_prices = self.dsc_client.get_stock_prices(symbols)
+            results = {}
+            for sym, data in dsc_prices.items():
+                results[sym] = StockPrice(
+                    symbol=data.symbol,
+                    price=data.price,
+                    change=data.change,
+                    change_percent=data.change_percent,
+                    volume=data.volume,
+                    date=data.last_update or datetime.datetime.now().strftime("%H:%M:%S"),
+                )
+            return results
+        except Exception as e:
+            logger.error(f"Error fetching stock prices: {e}")
+            return {}
 
     def enrich_fund_holdings(self, holdings: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
@@ -245,43 +191,11 @@ class StockClient:
     def get_vn30_index_history(self, days: int = 30) -> list[dict[str, Any]]:
         """
         Fetch VN30 index historical data.
-
-        Args:
-            days: Number of days of history
-
-        Returns:
-            List of daily OHLCV data for VN30 index.
+        NOTE: DSC API does not provide 30-day daily history publicly.
+        Returning empty list until a history endpoint is found.
         """
-        try:
-            stock = Vnstock().stock(symbol="VN30", source=self.source)
-
-            end_date = datetime.datetime.now().strftime("%Y-%m-%d")
-            start_date = (datetime.datetime.now() - datetime.timedelta(days=days)).strftime(
-                "%Y-%m-%d"
-            )
-
-            hist = stock.quote.history(symbol="VN30", start=start_date, end=end_date)
-
-            if hist is None or len(hist) == 0:
-                return []
-
-            results = []
-            for _, row in hist.iterrows():
-                results.append(
-                    {
-                        "date": str(row.get("time", "")),
-                        "open": float(row.get("open", 0)),
-                        "high": float(row.get("high", 0)),
-                        "low": float(row.get("low", 0)),
-                        "close": float(row.get("close", 0)),
-                        "volume": int(row.get("volume", 0)),
-                    }
-                )
-            return results
-
-        except Exception as e:
-            logger.error(f"Error fetching VN30 index history: {e}")
-            return []
+        logger.warning("VN30 index history temporarily unavailable with DSC client")
+        return []
 
     def get_vn30_top_movers(self, limit: int = 5) -> dict[str, list[dict[str, Any]]]:
         """
