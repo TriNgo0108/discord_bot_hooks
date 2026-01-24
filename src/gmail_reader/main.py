@@ -31,17 +31,25 @@ def summarize_content(text):
         return None
 
     prompt = (
-        "You are an expert email summarizer. Your goal is to provide a clear, concise, and actionable summary of the email content.\n\n"
-        "GUIDELINES:\n"
-        "1. **Content**: Focus on the main points, deadlines, and action items. Eliminate fluff.\n"
-        "2. **Links**: You MUST preserve all important links from the original text. Format them as Markdown: [link text](url).\n"
-        "3. **Formatting**: Use bullet points for readability. Bold key terms (dates, names, critical info).\n"
-        "4. **Length**: Keep the summary efficient but don't lose critical context.\n\n"
+        "You are a strict executive assistant. Your only goal is to extract the decision-critical info.\n\n"
+        "RULES:\n"
+        "1. NO FLUFF. Do not write 'The email says', 'This message is about', or 'In conclusion'.\n"
+        "2. START IMMEDIATELY with the 'TL;DR'.\n"
+        "3. IF NO ACTION IS REQUIRED, state 'FYI only'.\n"
+        "4. DENSITY IS PARAMOUNT. Use specific numbers, dates, and names.\n"
+        "5. PRESERVE LINKS. [link text](url) format.\n\n"
+        "FORMAT:\n"
+        "**TL;DR**: <1 densely packed sentence with the main limit/outcome>\n"
+        "**Actions**:\n"
+        "- <Action 1>\n"
+        "- <Action 2>\n"
+        "**Deadlines**:\n"
+        "- <Date>: <Event>\n\n"
         f"EMAIL CONTENT:\n{text}"
     )
 
-    max_retries = 3
-    base_delay = 2
+    max_retries = 5  # Increased from 3
+    base_delay = 10  # Increased from 2 to handle ~30s rate limit quotas
 
     for attempt in range(max_retries):
         try:
@@ -55,8 +63,10 @@ def summarize_content(text):
                 print(f"Summarization failed after {max_retries} attempts: {e}")
                 return None
 
-            print(f"Summarization attempt {attempt + 1} failed: {e}. Retrying...")
-            time.sleep(base_delay * (attempt + 1))  # Simple linear backoff
+            print(
+                f"Summarization attempt {attempt + 1} failed: {e}. Retrying in {base_delay * (attempt + 1)}s..."
+            )
+            time.sleep(base_delay * (attempt + 1))  # increased backoff
 
     return None
 
