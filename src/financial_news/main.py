@@ -5,6 +5,7 @@ from .feed_manager import FeedManager
 from .fmarket_client import FmarketClient
 from .news_enricher import NewsEnricher
 from .notifier import send_discord_webhook
+from .stock_client import StockClient
 from .summarizer import NewsSummarizer
 
 # Setup Logging
@@ -53,6 +54,12 @@ def main():
     gold_prices = fmarket_client.get_gold_prices()
     bank_rates = fmarket_client.get_bank_rates()
 
+    # Fetch VN30 Stock Data
+    logger.info("Fetching VN30 data...")
+    stock_client = StockClient(source="VCI")
+    vn30_index = stock_client.get_vn30_index_history(days=7)
+    vn30_symbols = list(stock_client.get_vn30_symbols())
+
     # Combine News
     combined_news = fmarket_news + vn_news[:5] + global_news[:5]
 
@@ -73,7 +80,13 @@ def main():
     logger.info("Generating AI Summary...")
     summarizer = NewsSummarizer()
 
-    market_stats = {"top_funds": top_funds, "gold_prices": gold_prices, "bank_rates": bank_rates}
+    market_stats = {
+        "top_funds": top_funds,
+        "gold_prices": gold_prices,
+        "bank_rates": bank_rates,
+        "vn30_index": vn30_index,
+        "vn30_symbols": vn30_symbols,
+    }
 
     summary_text = summarizer.summarize(combined_news, market_stats)
 

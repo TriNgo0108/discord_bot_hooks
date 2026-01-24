@@ -241,3 +241,80 @@ class StockClient:
             enriched.append(enriched_holding)
 
         return enriched
+
+    def get_vn30_index_history(self, days: int = 30) -> list[dict[str, Any]]:
+        """
+        Fetch VN30 index historical data.
+
+        Args:
+            days: Number of days of history
+
+        Returns:
+            List of daily OHLCV data for VN30 index.
+        """
+        try:
+            stock = Vnstock().stock(symbol="VN30", source=self.source)
+
+            end_date = datetime.datetime.now().strftime("%Y-%m-%d")
+            start_date = (datetime.datetime.now() - datetime.timedelta(days=days)).strftime(
+                "%Y-%m-%d"
+            )
+
+            hist = stock.quote.history(symbol="VN30", start=start_date, end=end_date)
+
+            if hist is None or len(hist) == 0:
+                return []
+
+            results = []
+            for _, row in hist.iterrows():
+                results.append(
+                    {
+                        "date": str(row.get("time", "")),
+                        "open": float(row.get("open", 0)),
+                        "high": float(row.get("high", 0)),
+                        "low": float(row.get("low", 0)),
+                        "close": float(row.get("close", 0)),
+                        "volume": int(row.get("volume", 0)),
+                    }
+                )
+            return results
+
+        except Exception as e:
+            logger.error(f"Error fetching VN30 index history: {e}")
+            return []
+
+    def get_vn30_top_movers(self, limit: int = 5) -> dict[str, list[dict[str, Any]]]:
+        """
+        Get top gainers and losers among VN30 stocks.
+
+        Note: Uses pre-cached price data to minimize API calls.
+
+        Args:
+            limit: Number of top stocks to return
+
+        Returns:
+            Dict with 'gainers' and 'losers' lists.
+        """
+        vn30_symbols = list(self.get_vn30_symbols())
+
+        # Fetch prices for all VN30 stocks
+        prices = self.get_stock_prices(vn30_symbols)
+
+        # Convert to list and sort
+        stock_list = [
+            {
+                "symbol": p.symbol,
+                "price": p.price,
+                "change": p.change,
+                "change_percent": p.change_percent,
+                "volume": p.volume,
+            }
+            for p in prices.values()
+        ]
+
+        sorted_by_change = sorted(stock_list, key=lambda x: x["change_percent"], reverse=True)
+
+        return {
+            "gainers": sorted_by_change[:limit],
+            "losers": sorted_by_change[-limit:][::-1],  # Reverse to show worst first
+        }

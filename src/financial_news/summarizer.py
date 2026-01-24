@@ -58,16 +58,34 @@ class NewsSummarizer:
                 [f"- {r['bank']}: {r['rate_12m']}%" for r in market_stats["bank_rates"]]
             )
 
+        # Format VN30 Index Data
+        vn30_text = ""
+        if "vn30_index" in market_stats and market_stats["vn30_index"]:
+            vn30_data = market_stats["vn30_index"]
+            if len(vn30_data) >= 2:
+                latest = vn30_data[-1]
+                prev = vn30_data[-2]
+                change = latest["close"] - prev["close"]
+                change_pct = (change / prev["close"]) * 100 if prev["close"] > 0 else 0
+                vn30_text = f"\nVN30 Index:\n- Current: {latest['close']:,.2f} ({change_pct:+.2f}%)\n- Volume: {latest['volume']:,}"
+
+        # Format VN30 Symbols
+        vn30_symbols_text = ""
+        if "vn30_symbols" in market_stats and market_stats["vn30_symbols"]:
+            symbols = market_stats["vn30_symbols"][:15]  # Top 15 for brevity
+            vn30_symbols_text = f"\nVN30 Components: {', '.join(symbols)}"
+
         prompt = (
             "You are a professional financial analyst for the Vietnamese market.\n"
             "Analyze the following financial news headlines and market data.\n"
             "Write a concise, professional daily financial briefing for a Vietnamese investor.\n"
             "The briefing must include:\n"
-            "1. **Market Snapshot**: Brief comment on key market indicators (Gold, USD, Funds performance).\n"
-            "2. **Key News**: Synthesize the most important news trends.\n"
-            "3. **Investment Suggestions**: Give specific actionable advice based on the data (e.g., if gold is high, what to do? if specific fund types are performing well, suggest them? Savings vs Investment?).\n\n"
+            "1. **Market Snapshot**: Comment on VN30 index performance, Gold, USD, and Fund trends.\n"
+            "2. **VN30 Analysis**: Highlight notable VN30 stocks from fund holdings.\n"
+            "3. **Key News**: Synthesize the most important news trends.\n"
+            "4. **Investment Suggestions**: Give specific actionable advice based on the data.\n\n"
             "The output should be in Vietnamese (Tiếng Việt) and formatted as a clear Markdown summary.\n\n"
-            f"--- Market Data ---\n{funds_text}\n{gold_text}\n{rates_text}\n\n"
+            f"--- Market Data ---\n{vn30_text}\n{funds_text}\n{gold_text}\n{rates_text}\n{vn30_symbols_text}\n\n"
             f"--- News ---\n{news_text}"
         )
 
