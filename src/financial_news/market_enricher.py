@@ -3,6 +3,7 @@ Market Enricher using Perplexity Search API (search-only, no LLM).
 Returns raw web search results for VN30, stocks, and funds.
 """
 
+import asyncio
 import logging
 from typing import Any
 
@@ -32,26 +33,6 @@ class MarketEnricher:
             List of search results with title, url, snippet, date
         """
         try:
-            # We can use execute_async or run_sync. Since our client is async, we'll use a wrapper or just use our Async TavilyClient
-            # Ideally we should use async everywhere.
-            # wait, the existing code is synchronous calling _search?
-            # Re-reading file... _search is synchronous in the original code?
-            # No, wait. formatting _search was doing httpx.post synchronously?
-            # Yes, original code used httpx.post without async def.
-            # My TavilyClient is async.
-            # I need to wrap it or adapt.
-            # Given existing code in market_enricher calls _search synchronously, I should probably use asyncio.run or make this class async.
-            # But making it async might break callers (summarizer.py?).
-            # Let's check callers. Summarizer calls enrich_market_stats synchronously?
-            # Let's check summarizer.py imports market_enricher.
-            # Actually, let's keep it simple and use run_in_executor or asyncio.run if needed,
-            # OR better, update the TavilyClient to have a synchronous wrapper or just direct httpx call here if I don't want to change architecture.
-            # But the 'common' TavilyClient is better.
-            # Let's see if I can make _search async and update callers.
-            # If I cannot check all callers, asyncio.run() is safer for now to keep sync interface.
-
-            import asyncio
-
             results = asyncio.run(self.tavily.search(query=query, max_results=max_results))
 
             return [
@@ -99,7 +80,7 @@ class MarketEnricher:
 
         query = f"VN30 index Vietnam stock market {direction} today news analysis"
 
-        logger.info("Searching VN30 context via Perplexity...")
+        logger.info("Searching VN30 context via Tavily...")
         results = self._search(query, max_results=3)
         return self._format_results(results)
 
@@ -124,7 +105,7 @@ class MarketEnricher:
 
         query = f"Vietnam stock {' '.join(symbols[:4])} news analysis today"
 
-        logger.info("Searching top stocks context via Perplexity...")
+        logger.info("Searching top stocks context via Tavily...")
         results = self._search(query, max_results=3)
         return self._format_results(results)
 
@@ -153,7 +134,7 @@ class MarketEnricher:
 
         query = f"Vietnam stock fund investment {' '.join(unique_holdings)} performance outlook"
 
-        logger.info("Searching fund context via Perplexity...")
+        logger.info("Searching fund context via Tavily...")
         results = self._search(query, max_results=3)
         return self._format_results(results)
 

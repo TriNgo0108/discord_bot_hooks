@@ -21,7 +21,7 @@ Generate a daily briefing for Vietnamese retail investors based on market data a
 ### Step 1: Market Snapshot
 Analyze VN30 index trend, gold prices (SJC vs world), USD/VND movement, and fund performance.
 
-### Step 2: VN30 Stock Analysis  
+### Step 2: VN30 Stock Analysis
 Identify notable stocks from fund holdings. Note concentration patterns and sector rotation.
 
 ### Step 3: News Synthesis
@@ -86,7 +86,7 @@ class NewsSummarizer:
         self.api_key = os.getenv("ZAI_API_KEY")
         self.model_name = "glm-4.7"
         self.base_url = "https://api.z.ai/api/coding/paas/v4"
-        self.max_retries = 2
+        self.max_retries = 5
 
     def summarize(
         self, news_items: list[dict[str, Any]], market_stats: dict[str, Any] = None
