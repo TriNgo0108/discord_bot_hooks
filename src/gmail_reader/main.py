@@ -24,32 +24,66 @@ if GEMINI_API_KEY:
         print(f"Failed to initialize Gemini client: {e}")
 
 
+# =============================================================================
+# OPTIMIZED PROMPT (Using prompt-engineering-patterns skill)
+# =============================================================================
+
+GMAIL_SUMMARY_PROMPT = """You are an executive assistant extracting decision-critical info from emails.
+
+## Rules
+1. NO FLUFF - Never write "The email says" or "In conclusion"
+2. START immediately with TL;DR
+3. PRESERVE important links as [text](url)
+4. Use SPECIFIC numbers, dates, names - no vague language
+5. If no action required, state "FYI only"
+
+## Examples
+
+### Example 1: Newsletter
+EMAIL: "OpenAI announced GPT-5 today with 2x context window. Enterprise pricing starts at $60/user. API pricing unchanged at $0.002/1K tokens."
+OUTPUT:
+**TL;DR**: GPT-5 launched with 2x context, API $0.002/1K (unchanged), Enterprise $60/user.
+**Actions**: None (FYI only)
+
+### Example 2: Meeting Request
+EMAIL: "Hi, can we sync for 30min on the Q4 budget? I'm proposing Dec 15 at 2pm. Please confirm by Dec 13."
+OUTPUT:
+**TL;DR**: John requests 30min Q4 budget sync on Dec 15, 2pm.
+**Actions**:
+- Accept/decline by Dec 13
+**Deadlines**:
+- Dec 13: RSVP deadline
+- Dec 15, 2pm: Meeting
+
+### Example 3: Payment/Invoice
+EMAIL: "Your AWS bill for December is $1,234.56. Auto-pay is enabled. Payment will be processed on Jan 5."
+OUTPUT:
+**TL;DR**: AWS bill $1,234.56 due Jan 5 (auto-pay active).
+**Actions**: None (auto-pay enabled)
+**Deadlines**:
+- Jan 5: Payment processed
+
+---
+
+## Email Content
+{email_content}
+"""
+
+
 def summarize_content(text):
-    """Summarize text using Gemini 2.0 Flash with retry logic."""
+    """Summarize text using Gemini with optimized prompt and retry logic."""
     if not _gemini_client:
         print("Gemini client not initialized. Skipping summarization.")
         return None
 
-    prompt = (
-        "You are a strict executive assistant. Your only goal is to extract the decision-critical info.\n\n"
-        "RULES:\n"
-        "1. NO FLUFF. Do not write 'The email says', 'This message is about', or 'In conclusion'.\n"
-        "2. START IMMEDIATELY with the 'TL;DR'.\n"
-        "3. IF NO ACTION IS REQUIRED, state 'FYI only'.\n"
-        "4. DENSITY IS PARAMOUNT. Use specific numbers, dates, and names.\n"
-        "5. PRESERVE LINKS. [link text](url) format.\n\n"
-        "FORMAT:\n"
-        "**TL;DR**: <1 densely packed sentence with the main limit/outcome>\n"
-        "**Actions**:\n"
-        "- <Action 1>\n"
-        "- <Action 2>\n"
-        "**Deadlines**:\n"
-        "- <Date>: <Event>\n\n"
-        f"EMAIL CONTENT:\n{text}"
-    )
+    # Truncate very long emails to avoid token limits
+    if len(text) > 8000:
+        text = text[:8000] + "\n\n[Content truncated...]"
 
-    max_retries = 5  # Increased from 3
-    base_delay = 10  # Increased from 2 to handle ~30s rate limit quotas
+    prompt = GMAIL_SUMMARY_PROMPT.format(email_content=text)
+
+    max_retries = 5
+    base_delay = 10
 
     for attempt in range(max_retries):
         try:
@@ -66,7 +100,7 @@ def summarize_content(text):
             print(
                 f"Summarization attempt {attempt + 1} failed: {e}. Retrying in {base_delay * (attempt + 1)}s..."
             )
-            time.sleep(base_delay * (attempt + 1))  # increased backoff
+            time.sleep(base_delay * (attempt + 1))
 
     return None
 

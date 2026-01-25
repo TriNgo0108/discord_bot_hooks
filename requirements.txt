@@ -3,3 +3,5 @@ httpx
 python-dotenv
 beautifulsoup4
 playwright
+zhipuai>=2.0.0
+aiohttp>=3.9.0

@@ -1,0 +1,78 @@
+name: Polymarket Analysis
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      max_events:
+        description: "Maximum events to analyze"
+        required: false
+        default: "10"
+      max_markets:
+        description: "Maximum markets per event"
+        required: false
+        default: "3"
+      min_confidence:
+        description: "Minimum confidence score (1-10)"
+        required: false
+        default: "5"
+      min_edge:
+        description: "Minimum edge percentage (0.10 = 10%)"
+        required: false
+        default: "0.10"
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  analyze:
+    name: Analyze Polymarket
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Polymarket Analysis
+        env:
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          python -m src.poly_market.main \
+            --events ${{ github.event.inputs.max_events || '10' }} \
+            --markets ${{ github.event.inputs.max_markets || '3' }} \
+            --confidence ${{ github.event.inputs.min_confidence || '5' }} \
+            --edge ${{ github.event.inputs.min_edge || '0.10' }} \
+            --output results/polymarket_$(date +%Y%m%d_%H%M%S).json \
+            --discord
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: polymarket-analysis-${{ github.run_number }}
+          path: results/*.json
+          retention-days: 30
+
+      - name: Commit results to repository
+        if: success()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          mkdir -p results
+          git add results/*.json || true
+          git diff --staged --quiet || git commit -m "chore: add polymarket analysis results [$(date +%Y-%m-%d)]"
+          git push || echo "No changes to push"
