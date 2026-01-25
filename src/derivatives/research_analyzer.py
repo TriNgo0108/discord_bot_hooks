@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from src.common.tavily_client import TavilyClient
+
 from .config import DERIVATIVES_CONFIG
 from .models import DerivativesAnalysis, TradingRecommendation
 
@@ -200,13 +201,15 @@ class ResearchAnalyzer:
             response.raise_for_status()
             data = response.json()
             content = data["choices"][0]["message"]["content"]
-            return self._parse_response(content)
+            return self._parse_response(content, market_data)
 
         except Exception as e:
             logger.error(f"GLM analysis failed: {e}")
             return self._create_fallback_analysis(market_data)
 
-    def _parse_response(self, content: str) -> DerivativesAnalysis | None:
+    def _parse_response(
+        self, content: str, market_data: dict[str, Any]
+    ) -> DerivativesAnalysis | None:
         """Parse JSON response."""
         try:
             # Extract JSON
@@ -235,7 +238,7 @@ class ResearchAnalyzer:
 
             return DerivativesAnalysis(
                 timestamp=__import__("datetime").datetime.utcnow(),
-                market_data={},  # Don't store full raw data in analysis object to save space
+                market_data=market_data,  # Store full data for embed generation
                 key_findings=data.get("key_findings", []),
                 market_sentiment=data.get("market_sentiment", "NEUTRAL"),
                 notable_flows=data.get("notable_flows", []),

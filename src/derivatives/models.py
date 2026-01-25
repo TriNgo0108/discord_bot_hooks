@@ -38,6 +38,8 @@ class FuturesContract:
     funding_rate: float | None = None  # For perpetuals
     liquidation_24h: float | None = None
     source: str = "unknown"
+    data_date: datetime | None = None
+    is_stale: bool = False
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -113,10 +115,38 @@ class DerivativesAnalysis:
         if flows_text:
             fields.append({"name": "🌊 Notable Flows", "value": flows_text, "inline": False})
 
+        # Check for stale data in market_data
+        stale_warning = ""
+        data_date_str = ""
+
+        # We need to peek into the market data structure to find dates
+        # "market_structure" list contains the contract dicts
+        futures_data = self.market_data.get("market_structure", [])
+        for item in futures_data:
+            if isinstance(item, dict):
+                if item.get("is_stale"):
+                    stale_warning = "⚠️ **WARNING: DATA MAY BE STALE** ⚠️"
+
+                d_date = item.get("data_date")
+                if d_date:
+                    data_date_str = f"Data Date: {d_date}"
+                    if item.get("is_stale"):
+                        data_date_str += " (OLD)"
+                    # Just grab the first one for the footer
+                    break
+
+        description = f"Analysis generated at {self.timestamp.strftime('%Y-%m-%d %H:%M UTC')}"
+        if stale_warning:
+            description = f"{stale_warning}\n{description}"
+
+        footer_text = "Powered by Perplexity & GLM-4.7"
+        if data_date_str:
+            footer_text += f" | {data_date_str}"
+
         return {
             "title": f"Derivatives Market Analysis ({self.market_sentiment})",
-            "description": f"Analysis generated at {self.timestamp.strftime('%Y-%m-%d %H:%M UTC')}",
+            "description": description,
             "color": color_map.get(self.market_sentiment, 0x808080),
             "fields": fields,
-            "footer": {"text": "Powered by Perplexity & GLM-4.7"},
+            "footer": {"text": footer_text},
         }

@@ -72,14 +72,14 @@ async def analyze_derivatives(instruments: list[str], send_discord: bool = True)
                 print(f"- {r.direction} {r.instrument} ({r.confidence}/10): {r.reasoning[:100]}...")
 
             # 4. Discord Notification
-            if send_discord and DERIVATIVES_CONFIG.DISCORD_WEBHOOK_URL:
+            if DERIVATIVES_CONFIG.DISCORD_WEBHOOK_URL:
                 logger.info("Step 3: Sending Discord notification...")
                 embed = analysis.to_discord_embed()
 
                 await client.post(DERIVATIVES_CONFIG.DISCORD_WEBHOOK_URL, json={"embeds": [embed]})
                 logger.info("Notification sent!")
             else:
-                logger.info("Discord notification skipped (disabled or no URL configured)")
+                logger.info("Discord notification skipped (No Webhook URL configured)")
 
         finally:
             await aggregator.close()
