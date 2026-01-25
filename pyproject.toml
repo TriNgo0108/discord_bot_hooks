@@ -1,3 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "discord_bot_hooks"
+version = "0.1.0"
+description = "Discord Bot Hooks"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx",
+    "python-dotenv",
+    "tenacity>=8.0.0",
+]
+
+[project.optional-dependencies]
+financial_news = [
+    "feedparser",
+    "beautifulsoup4",
+]
+derivatives = [
+    "vnstock>=0.2.0",
+]
+expense_report = [
+    "psycopg2-binary",
+]
+todo_notifier = [
+    "psycopg2-binary",
+]
+dev = [
+    "requests",
+    "playwright",
+    "aiohttp>=3.9.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

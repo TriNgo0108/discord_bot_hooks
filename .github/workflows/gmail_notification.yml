@@ -19,7 +19,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r src/gmail_reader/requirements.txt
+          python -m pip install --upgrade pip
+          pip install .
 
       - name: Run Gmail Reader
         env:
@@ -28,4 +29,4 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           DISCORD_WEBHOOK_GMAIL: ${{ secrets.DISCORD_WEBHOOK_GMAIL }}
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
-        run: python src/gmail_reader/main.py
+        run: python -m src.gmail_reader.main

@@ -1,2 +1,0 @@
--r ../common/requirements.txt
-psycopg2-binary

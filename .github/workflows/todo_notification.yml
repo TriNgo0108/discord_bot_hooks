@@ -19,11 +19,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r src/todo_notifier/requirements.txt
+          python -m pip install --upgrade pip
+          pip install .[todo_notifier]
 
       - name: Run Todo Notifier
         env:
           ENV: production
           DB_URL: ${{ secrets.DB_URL }}
           DISCORD_WEBHOOK_TODO: ${{ secrets.DISCORD_WEBHOOK_TODO }}
-        run: python src/todo_notifier/main.py
+        run: python -m src.todo_notifier.main
