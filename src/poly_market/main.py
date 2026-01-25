@@ -75,26 +75,27 @@ async def analyze_polymarket(
         # Limit markets per event
         markets = event.markets[:max_markets]
 
-        for market in markets:
-            logger.info(f"Processing: {market.question[:50]}...")
+        # Batch process markets for the event
+        logger.info(f"Processing event: {event.title} ({len(markets)} markets)...")
 
-            try:
-                research, analysis = await analyzer.research_and_analyze(market)
+        try:
+            results = await analyzer.batch_research_and_analyze_event(event, markets)
 
+            for market, research, analysis in results:
                 if research and analysis:
                     all_results.append((event, market, research, analysis))
                     logger.info(
                         f"  → {analysis.recommendation.value} "
                         f"(edge: {analysis.edge_percentage:.1f}%, "
-                        f"confidence: {analysis.confidence}/10)"
+                        f"confidence: {analysis.confidence}/10) - {market.question[:30]}..."
                     )
 
-            except Exception as e:
-                logger.error(f"Failed to process market {market.id}: {e}")
-                continue
+        except Exception as e:
+            logger.error(f"Failed to process event {event.id}: {e}")
+            continue
 
-            # Rate limiting delay
-            await asyncio.sleep(2)
+        # Rate limiting delay per event
+        await asyncio.sleep(2)
 
     # Step 4: Generate suggestions
     logger.info("Step 4: Generating trading suggestions...")

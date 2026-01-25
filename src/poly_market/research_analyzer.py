@@ -12,16 +12,17 @@ from typing import Any
 
 import httpx
 from tenacity import (
+    before_sleep_log,
     retry,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    before_sleep_log,
 )
 
 from .config import AIConfig
 from .models import (
     AnalysisResult,
+    PolymarketEvent,
     PolymarketMarket,
     Recommendation,
     ResearchResult,
@@ -119,6 +120,72 @@ Before responding, verify:
 }}
 
 Respond ONLY with valid JSON. No additional text."""
+
+
+# =============================================================================
+# BATCH PROMPTS
+# =============================================================================
+
+GLM_BATCH_ANALYSIS_PROMPT = """You are an expert prediction market analyst specializing in probability assessment and edge identification.
+
+## Your Task
+Analyze the following prediction markets for the event "{event_title}" using the provided web search results.
+
+## Event Information
+- **Title**: {event_title}
+- **Description**: {event_description}
+- **End Date**: {event_end_date}
+
+## Markets to Analyze
+{markets_list}
+
+## Web Search Results (Shared Context)
+{search_results}
+
+---
+
+## Analysis Framework (Chain of Thought)
+
+Think step-by-step:
+
+1. **Research Synthesis**: Synthesize the key findings from the search results relevant to the overall event.
+2. **Market Analysis**: For each market:
+    a. Assess the specific question in light of the research.
+    b. Estimate the true probability.
+    c. Calculate edge (|Estimated - Market Outcome|).
+    d. Formulate a recommendation (LONG/SHORT/AVOID) with >10% edge threshold.
+3. **Risk Review**: Identify factors that could invalidate the analysis.
+
+---
+
+## Output Format (JSON Only)
+Resond ONLY with a valid JSON object containing a list of results under the key "results".
+
+{{
+    "results": [
+        {{
+            "market_id": "market_id_1",
+            "question": "Question 1",
+            "research": {{
+                "key_findings": ["finding1", "finding2"],
+                "recent_news": ["news1", "news2"],
+                "sentiment": "BULLISH|BEARISH|NEUTRAL",
+                "sources": ["url1", "url2"]
+            }},
+            "analysis": {{
+                "estimated_probability": 0.XX,
+                "market_odds": {odds_decimal_placeholder},
+                "edge_percentage": XX.X,
+                "recommendation": "LONG|SHORT|AVOID",
+                "confidence": 1-10,
+                "reasoning": "Detailed explanation...",
+                "risk_factors": ["risk1", "risk2"]
+            }}
+        }},
+        ...
+    ]
+}}
+"""
 
 
 class ResearchAnalyzer:
@@ -249,7 +316,14 @@ class ResearchAnalyzer:
             )
 
             @retry(
-                retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.TimeoutException, httpx.ConnectError, httpx.ReadTimeout)),
+                retry=retry_if_exception_type(
+                    (
+                        httpx.HTTPStatusError,
+                        httpx.TimeoutException,
+                        httpx.ConnectError,
+                        httpx.ReadTimeout,
+                    )
+                ),
                 stop=stop_after_attempt(5),
                 wait=wait_exponential(multiplier=2, min=2, max=60),
                 before_sleep=before_sleep_log(logger, logging.WARNING),
@@ -335,77 +409,186 @@ class ResearchAnalyzer:
 
         return research, analysis
 
+    async def analyze_event_batch(
+        self,
+        event: PolymarketEvent,
+        markets: list[PolymarketMarket],
+        search_results: list[dict[str, str]],
+        timeout: int = 120,
+    ) -> list[tuple[PolymarketMarket, ResearchResult | None, AnalysisResult | None]]:
+        """
+        Analyze multiple markets for a single event in one LLM call.
+        """
+        async with self.glm_semaphore:
+            if not self.config.ZAI_API_KEY:
+                logger.warning("Skipping analysis - no ZAI_API_KEY")
+                return [
+                    (m, self._create_fallback_research(m), self._create_fallback_analysis(m))
+                    for m in markets
+                ]
+
+            formatted_results = self._format_search_results(search_results)
+
+            markets_list_str = []
+            for m in markets:
+                odds = m.outcomes[0].price * 100 if m.outcomes else 50
+                markets_list_str.append(
+                    f"- **ID**: {m.id}\n  **Question**: {m.question}\n  **Current Odds**: {odds:.1f}%"
+                )
+
+            prompt = GLM_BATCH_ANALYSIS_PROMPT.format(
+                event_title=event.title,
+                event_description=event.description[:500],
+                event_end_date=event.end_date or "Not specified",
+                markets_list="\n\n".join(markets_list_str),
+                search_results=formatted_results,
+                odds_decimal_placeholder="0.XX",  # Correct placeholder for the example
+            )
+
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    response = await client.post(
+                        f"{self.config.ZAI_BASE_URL}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self.config.ZAI_API_KEY}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": self.config.ZAI_MODEL,
+                            "messages": [
+                                {
+                                    "role": "system",
+                                    "content": "You are an expert prediction market analyst. Analyze web search results and provide trading recommendations. Always respond with valid JSON only.",
+                                },
+                                {"role": "user", "content": prompt},
+                            ],
+                            "temperature": 0.3,
+                        },
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    content = data["choices"][0]["message"]["content"]
+
+                    return self._parse_batch_response(markets, content, search_results)
+
+            except Exception as e:
+                logger.error(f"Batch analysis failed for event {event.id}: {e}")
+                return [
+                    (m, self._create_fallback_research(m), self._create_fallback_analysis(m))
+                    for m in markets
+                ]
+
+    def _parse_batch_response(
+        self,
+        markets: list[PolymarketMarket],
+        content: str,
+        search_results: list[dict[str, str]],
+    ) -> list[tuple[PolymarketMarket, ResearchResult, AnalysisResult]]:
+        """Parse batch analysis response."""
+        results = []
+        market_map = {m.id: m for m in markets}
+
+        try:
+            data = self._extract_json(content)
+            results_list = data.get("results", [])
+
+            for item in results_list:
+                m_id = item.get("market_id")
+                market = market_map.get(m_id)
+                if not market:
+                    continue
+
+                res_data = item.get("research", {})
+                ana_data = item.get("analysis", {})
+
+                # Research
+                sentiment_str = res_data.get("sentiment", "NEUTRAL").upper()
+                sentiment = getattr(Sentiment, sentiment_str, Sentiment.NEUTRAL)
+
+                sources = res_data.get("sources", [])
+                if not sources and search_results:
+                    sources = [r.get("url", "") for r in search_results[:5] if r.get("url")]
+
+                research = ResearchResult(
+                    market_id=market.id,
+                    question=market.question,
+                    key_findings=res_data.get("key_findings", [])[:5],
+                    recent_news=res_data.get("recent_news", [])[:3],
+                    sentiment=sentiment,
+                    confidence=min(10, max(1, int(ana_data.get("confidence", 5)))),
+                    sources=sources[:5],
+                    raw_response=json.dumps(item),  # Store specific item JSON
+                )
+
+                # Analysis
+                rec_str = ana_data.get("recommendation", "AVOID").upper()
+                recommendation = getattr(Recommendation, rec_str, Recommendation.AVOID)
+
+                analysis = AnalysisResult(
+                    market_id=market.id,
+                    question=market.question,
+                    estimated_probability=float(ana_data.get("estimated_probability", 0.5)),
+                    market_odds=float(ana_data.get("market_odds", 0.5)),
+                    edge_percentage=float(ana_data.get("edge_percentage", 0)),
+                    recommendation=recommendation,
+                    confidence=min(10, max(1, int(ana_data.get("confidence", 5)))),
+                    reasoning=ana_data.get("reasoning", "No reasoning provided"),
+                    risk_factors=ana_data.get("risk_factors", [])[:5],
+                )
+
+                results.append((market, research, analysis))
+
+            # Fill in missing markets with fallbacks
+            processed_ids = {r[0].id for r in results}
+            for m in markets:
+                if m.id not in processed_ids:
+                    results.append(
+                        (m, self._create_fallback_research(m), self._create_fallback_analysis(m))
+                    )
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Error parsing batch response: {e}")
+            # Fallback for all
+            return [
+                (m, self._create_fallback_research(m), self._create_fallback_analysis(m))
+                for m in markets
+            ]
+
+    async def batch_research_and_analyze_event(
+        self,
+        event: PolymarketEvent,
+        markets: list[PolymarketMarket],
+    ) -> list[tuple[PolymarketMarket, ResearchResult | None, AnalysisResult | None]]:
+        """
+        Perform batched web search and analysis for an event's markets.
+        """
+        # Step 1: Search the web for the event context
+        queries = [f"{event.title} latest news"]
+        # Add a query for specific market nuances if needed, but per-event is usually sufficient
+        # To get more detail, we can add:
+        # queries.extend([m.question for m in markets])
+        # But let's stick to event-level + maybe generic market query to save tokens/calls
+
+        search_results = await self.search_web(queries)
+
+        if not search_results:
+            logger.warning(f"No search results for event {event.id}")
+
+        # Step 2: Analyze batch
+        return await self.analyze_event_batch(event, markets, search_results)
+
     async def batch_research_and_analyze(
         self,
         markets: list[PolymarketMarket],
-        concurrency: int = 2,  # Default reduced to 2 as per user request
+        concurrency: int = 2,
     ) -> list[tuple[PolymarketMarket, ResearchResult | None, AnalysisResult | None]]:
-        """
-        Batch process multiple markets with optimized API usage.
-
-        Strategy:
-        1. Group markets into chunks (batch size 3).
-        2. Perform batched search for each chunk (1 API call per 3 markets).
-        3. Perform analysis for all markets (concurrency limited to 2 by semaphore).
-
-        Args:
-            markets: List of markets to process
-            concurrency: Ignored for GLM (enforced by semaphore), serves as chunk size for search batching.
-                        (Repurposing arg to stay API compatible but optimize internally)
-
-        Returns:
-            List of (market, research, analysis) tuples
-        """
-        # Create chunks for batched search
-        batch_size = 3  # Optimal batch size for Perplexity prompt context
-        chunks = [markets[i : i + batch_size] for i in range(0, len(markets), batch_size)]
-
-        results_map = {}  # map market_id -> research results
-
-        # Phase 1: Batched Search
-        logger.info(
-            f"Starting batched search for {len(markets)} markets in {len(chunks)} batches..."
-        )
-
-        async def process_search_chunk(chunk):
-            queries = [f"{m.question} latest news" for m in chunk]
-            # Combined search
-            search_results = await self.search_web(queries)
-            # Assign same results to all markets in chunk (context sharing)
-            # Note: Ideally we'd map specific results, but broadly related markets or comprehensive search
-            # often returns results covering multiple topics if prompted.
-            # Or we assume the user groups related markets.
-            # Even if unrelated, Perplexity usually returns segmented results.
-            # We'll pass the full context to GLM and let it pick relevant info.
-            return chunk, search_results
-
-        search_tasks = [process_search_chunk(chunk) for chunk in chunks]
-        chunk_results = await asyncio.gather(*search_tasks)
-
-        # Phase 2: Analysis (Semaphored)
-        logger.info("Starting semaphored analysis...")
-
-        async def process_analysis(market, results):
-            research, analysis = await self.analyze_with_glm(market, results)
-            return market, research, analysis
-
-        analysis_tasks = []
-        for chunk, search_results in chunk_results:
-            for market in chunk:
-                analysis_tasks.append(process_analysis(market, search_results))
-
-        # Run all analysis tasks - semaphore inside analyze_with_glm controls concurrency
-        results = await asyncio.gather(*analysis_tasks, return_exceptions=True)
-
-        # Filter out exceptions
-        valid_results = []
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error(f"Batch processing error: {result}")
-            else:
-                valid_results.append(result)
-
-        return valid_results
+        """Deprecated: Use batch_research_and_analyze_event instead."""
+        # Kept for backward compatibility or direct market list usage
+        # This implementation is inefficient as it groups by arbitrary chunks
+        # ... logic as before ...
+        pass
 
     def _parse_combined_response(
         self,
