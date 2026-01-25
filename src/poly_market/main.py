@@ -127,6 +127,7 @@ def save_results(
             "suggestions": [s.to_dict() for s in suggestions],
         }
 
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 

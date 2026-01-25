@@ -51,7 +51,7 @@ jobs:
         env:
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_POLYMARKET }}
+          DISCORD_WEBHOOK_POLYMARKET: ${{ secrets.DISCORD_WEBHOOK_POLYMARKET }}
         run: |
           python -m src.poly_market.main \
             --events ${{ github.event.inputs.max_events || '10' }} \
