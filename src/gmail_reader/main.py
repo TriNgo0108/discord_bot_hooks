@@ -97,7 +97,6 @@ def summarize_content(text):
                         },
                         {"role": "user", "content": prompt},
                     ],
-                    "max_tokens": 1024,
                     "temperature": 0.3,
                 },
                 timeout=60,

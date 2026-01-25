@@ -132,7 +132,6 @@ class NewsSummarizer:
                             },
                             {"role": "user", "content": prompt},
                         ],
-                        "max_tokens": 2048,
                         "temperature": 0.3,
                     },
                     timeout=60.0,
