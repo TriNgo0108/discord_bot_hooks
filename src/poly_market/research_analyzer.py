@@ -19,6 +19,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from src.common.ddg_client import DDGClient
 from src.common.tavily_client import TavilyClient
 
 from .config import AIConfig
@@ -204,12 +205,18 @@ class ResearchAnalyzer:
         self._validate_config()
         # GLM-4.7 concurrency limit (user specified limit of 2)
         self.glm_semaphore = asyncio.Semaphore(2)
-        # Initialize Tavily client
-        self.tavily = TavilyClient(api_key=self.config.TAVILY_API_KEY)
+
+        # Initialize Search client
+        if self.config.SEARCH_PROVIDER == "ddg":
+            self.search_client = DDGClient()
+            logger.info("Using DuckDuckGo Search provider")
+        else:
+            self.search_client = TavilyClient(api_key=self.config.TAVILY_API_KEY)
+            logger.info("Using Tavily Search provider")
 
     def _validate_config(self) -> None:
         """Validate that required API keys are present."""
-        if not self.config.TAVILY_API_KEY:
+        if self.config.SEARCH_PROVIDER == "tavily" and not self.config.TAVILY_API_KEY:
             logger.warning("TAVILY_API_KEY not set - web search will be skipped")
         if not self.config.ZAI_API_KEY:
             logger.warning("ZAI_API_KEY not set - analysis will be limited")
@@ -221,7 +228,7 @@ class ResearchAnalyzer:
         timeout: int = 30,
     ) -> list[dict[str, str]]:
         """
-        Search the web using Tavily API.
+        Search the web using the configured provider.
         Supports batched queries by joining them.
 
         Args:
@@ -232,7 +239,8 @@ class ResearchAnalyzer:
         Returns:
             List of search results with title, url, snippet, date
         """
-        if not self.tavily.api_key:
+        # For Tavily, check API key. For DDG, it's always available (unless blocked).
+        if self.config.SEARCH_PROVIDER == "tavily" and not self.config.TAVILY_API_KEY:
             logger.warning("Skipping web search - no API key")
             return []
 
@@ -243,9 +251,9 @@ class ResearchAnalyzer:
             logger.info(f"Combined {len(query)} queries into single request")
 
         try:
-            # Use Tavily with news filter (last 30 days)
-            # as requested by user logic
-            response = await self.tavily.search(
+            # Use configured client
+            # pass days=30 for news filtering (handled by both clients)
+            response = await self.search_client.search(
                 query=str(final_query),
                 max_results=max_results,
                 days=30,  # Filter for last 30 days news
@@ -258,7 +266,7 @@ class ResearchAnalyzer:
                     {
                         "title": item.get("title", ""),
                         "url": item.get("url", ""),
-                        "snippet": item.get("content", ""),  # Tavily returns 'content'
+                        "snippet": item.get("content", ""),  # Both clients map to 'content'
                         "date": item.get("published_date", ""),
                     }
                 )
@@ -267,7 +275,7 @@ class ResearchAnalyzer:
             return results
 
         except Exception as e:
-            logger.error(f"Tavily search failed: {e}")
+            logger.error(f"Web search failed: {e}")
             return []
 
     async def analyze_with_glm(

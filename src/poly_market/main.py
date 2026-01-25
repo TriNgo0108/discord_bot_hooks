@@ -292,8 +292,19 @@ def main() -> None:
         action="store_true",
         help="Include previously analyzed events (by default they are excluded)",
     )
+    parser.add_argument(
+        "--provider",
+        type=str,
+        choices=["tavily", "ddg"],
+        default=None,
+        help="Search provider to use (overrides SEARCH_PROVIDER env var)",
+    )
 
     args = parser.parse_args()
+
+    # Override search provider if specified
+    if args.provider:
+        os.environ["SEARCH_PROVIDER"] = args.provider
 
     suggestions = asyncio.run(
         analyze_polymarket(

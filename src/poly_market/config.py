@@ -43,6 +43,9 @@ class AIConfig:
     # Tavily Search API
     TAVILY_API_KEY: str = ""
 
+    # Search Provider: "tavily" or "ddg"
+    SEARCH_PROVIDER: str = "tavily"
+
     @classmethod
     def from_env(cls) -> "AIConfig":
         """Load configuration from environment variables."""
@@ -51,6 +54,7 @@ class AIConfig:
             ZAI_MODEL=os.getenv("ZAI_MODEL", "glm-4.7"),
             PERPLEXITY_API_KEY=os.getenv("PERPLEXITY_API_KEY", ""),
             TAVILY_API_KEY=os.getenv("TAVILY_API_KEY", ""),
+            SEARCH_PROVIDER=os.getenv("SEARCH_PROVIDER", "tavily").lower(),
         )
 
 
