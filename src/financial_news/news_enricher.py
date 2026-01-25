@@ -2,69 +2,33 @@ import logging
 import os
 from typing import Any
 
-import httpx
+from src.common.tavily_client import TavilyClient
 
 logger = logging.getLogger(__name__)
 
 
 class NewsEnricher:
     """
-    Enriches news items with additional context using WebSearchAPI.ai.
+    Enriches news items with additional context using Tavily Search API.
     """
 
-    BASE_URL = "https://api.websearchapi.ai/ai-search"
-
     def __init__(self):
-        self.api_key = os.getenv("WEBSEARCH_API_KEY")
-        if not self.api_key:
-            logger.warning("WEBSEARCH_API_KEY not found. Enrichment will be disabled.")
+        self.tavily = TavilyClient()
 
-    def search(self, query: str) -> str:
+    async def search_async(self, query: str) -> str:
         """
         Search for a query and return a summarized context string.
         """
-        if not self.api_key:
+        if not self.tavily.api_key:
             return ""
 
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
+        return await self.tavily.get_search_context(query, max_results=3)
 
-        # Using 'vn' as requested
-        payload = {
-            "query": query,
-            "maxResults": 3,
-            "includeContent": False,
-            "includeAnswer": False,
-            "country": "vn",
-        }
+    def search(self, query: str) -> str:
+        """Synchronous wrapper for search."""
+        import asyncio
 
-        try:
-            response = httpx.post(self.BASE_URL, headers=headers, json=payload, timeout=20.0)
-
-            if response.status_code == 401:
-                logger.error("WebSearchAPI Unauthorized. Check your key.")
-                return ""
-            if response.status_code == 403:  # Quota or Forbidden
-                logger.warning("WebSearchAPI Forbidden/Quota Exceeded.")
-                return ""
-
-            response.raise_for_status()
-            data = response.json()
-
-            context = ""
-            if "results" in data:
-                for res in data["results"]:
-                    title = res.get("title", "")
-                    snippet = res.get("snippet", res.get("description", ""))
-                    context += f"- [Web] {title}: {snippet}\n"
-
-            return context.strip()
-
-        except Exception as e:
-            logger.error(f"Error enriching news for '{query}': {e}")
-            return ""
+        return asyncio.run(self.search_async(query))
 
     def enrich_news_items(
         self, news_items: list[dict[str, Any]], limit: int = 3
@@ -73,7 +37,7 @@ class NewsEnricher:
         Enriches the top N news items with web search context.
         Modifies the items in-place (or returns list of enriched items).
         """
-        if not self.api_key:
+        if not self.tavily.api_key:
             return news_items
 
         count = 0

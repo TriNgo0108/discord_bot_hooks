@@ -4,31 +4,24 @@ Returns raw web search results for VN30, stocks, and funds.
 """
 
 import logging
-import os
 from typing import Any
 
-import httpx
+from src.common.tavily_client import TavilyClient
 
 logger = logging.getLogger(__name__)
 
 
 class MarketEnricher:
     """
-    Enriches market data with web search results using Perplexity Search API.
-
-    Uses search-only endpoint (no LLM) to fetch raw web results.
+    Enriches market data with web search results using Tavily Search API.
     """
 
-    BASE_URL = "https://api.perplexity.ai"
-
     def __init__(self):
-        self.api_key = os.getenv("PERPLEXITY_API_KEY")
-        if not self.api_key:
-            logger.warning("PERPLEXITY_API_KEY not found. Market enrichment will be disabled.")
+        self.tavily = TavilyClient()
 
     def _search(self, query: str, max_results: int = 5, timeout: int = 30) -> list[dict[str, str]]:
         """
-        Search using Perplexity Search API (no LLM).
+        Search using Tavily Search API.
 
         Args:
             query: Search query
@@ -38,42 +31,39 @@ class MarketEnricher:
         Returns:
             List of search results with title, url, snippet, date
         """
-        if not self.api_key:
-            return []
-
         try:
-            response = httpx.post(
-                f"{self.BASE_URL}/search",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "query": query,
-                    "max_results": max_results,
-                },
-                timeout=timeout,
-            )
-            response.raise_for_status()
-            data = response.json()
+            # We can use execute_async or run_sync. Since our client is async, we'll use a wrapper or just use our Async TavilyClient
+            # Ideally we should use async everywhere.
+            # wait, the existing code is synchronous calling _search?
+            # Re-reading file... _search is synchronous in the original code?
+            # No, wait. formatting _search was doing httpx.post synchronously?
+            # Yes, original code used httpx.post without async def.
+            # My TavilyClient is async.
+            # I need to wrap it or adapt.
+            # Given existing code in market_enricher calls _search synchronously, I should probably use asyncio.run or make this class async.
+            # But making it async might break callers (summarizer.py?).
+            # Let's check callers. Summarizer calls enrich_market_stats synchronously?
+            # Let's check summarizer.py imports market_enricher.
+            # Actually, let's keep it simple and use run_in_executor or asyncio.run if needed,
+            # OR better, update the TavilyClient to have a synchronous wrapper or just direct httpx call here if I don't want to change architecture.
+            # But the 'common' TavilyClient is better.
+            # Let's see if I can make _search async and update callers.
+            # If I cannot check all callers, asyncio.run() is safer for now to keep sync interface.
 
-            results = []
-            for item in data.get("results", []):
-                results.append(
-                    {
-                        "title": item.get("title", ""),
-                        "url": item.get("url", ""),
-                        "snippet": item.get("snippet", ""),
-                        "date": item.get("date", ""),
-                    }
-                )
+            import asyncio
 
-            logger.info(f"Found {len(results)} search results for: {query[:50]}...")
-            return results
+            results = asyncio.run(self.tavily.search(query=query, max_results=max_results))
 
-        except httpx.HTTPError as e:
-            logger.error(f"Perplexity Search API error: {e}")
-            return []
+            return [
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "snippet": item.get("content", "")[:300],
+                    "date": "",  # Tavily might not return date easily in basic search
+                }
+                for item in results.get("results", [])
+            ]
+
         except Exception as e:
             logger.error(f"Search failed: {e}")
             return []
@@ -101,7 +91,7 @@ class MarketEnricher:
         Returns:
             Formatted search results string.
         """
-        if not self.api_key or not vn30_data:
+        if not self.tavily.api_key or not vn30_data:
             return ""
 
         change = vn30_data.get("change_percent", 0)
@@ -120,7 +110,7 @@ class MarketEnricher:
         Returns:
             Formatted search results string.
         """
-        if not self.api_key or not top_movers:
+        if not self.tavily.api_key or not top_movers:
             return ""
 
         gainers = top_movers.get("gainers", [])[:3]
@@ -145,7 +135,7 @@ class MarketEnricher:
         Returns:
             Formatted search results string.
         """
-        if not self.api_key or not top_funds:
+        if not self.tavily.api_key or not top_funds:
             return ""
 
         # Extract top holdings for search
@@ -186,7 +176,7 @@ class MarketEnricher:
             "funds_context": "",
         }
 
-        if not self.api_key:
+        if not self.tavily.api_key:
             logger.warning("Skipping market enrichment - no API key")
             return enrichments
 

@@ -249,9 +249,9 @@ class ResearchAnalyzer:
             )
 
             @retry(
-                retry=retry_if_exception_type(httpx.HTTPStatusError),
-                stop=stop_after_attempt(3),
-                wait=wait_exponential(multiplier=5, min=5, max=60),
+                retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.TimeoutException, httpx.ConnectError, httpx.ReadTimeout)),
+                stop=stop_after_attempt(5),
+                wait=wait_exponential(multiplier=2, min=2, max=60),
                 before_sleep=before_sleep_log(logger, logging.WARNING),
                 reraise=True,
             )
@@ -282,8 +282,14 @@ class ResearchAnalyzer:
                 data = await _call_zai_api()
                 content = data["choices"][0]["message"]["content"]
                 return self._parse_combined_response(market, content, search_results)
-            except httpx.HTTPError as e:
-                logger.error(f"Z.AI API error for market {market.id}: {e}")
+            except httpx.HTTPStatusError as e:
+                logger.error(f"Z.AI API HTTP error: {e}")
+                logger.error(f"Response body: {e.response.text}")
+                return self._create_fallback_research(market), self._create_fallback_analysis(
+                    market
+                )
+            except httpx.RequestError as e:
+                logger.error(f"Z.AI API request failed (timeout/connection): {e}")
                 return self._create_fallback_research(market), self._create_fallback_analysis(
                     market
                 )

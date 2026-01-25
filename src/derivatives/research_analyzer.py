@@ -6,6 +6,7 @@ from typing import Any
 
 import httpx
 
+from src.common.tavily_client import TavilyClient
 from .config import DERIVATIVES_CONFIG
 from .models import DerivativesAnalysis, TradingRecommendation
 
@@ -80,6 +81,7 @@ class ResearchAnalyzer:
     def __init__(self, http_client: httpx.AsyncClient):
         self.config = DERIVATIVES_CONFIG
         self.client = http_client
+        self.tavily = TavilyClient(api_key=self.config.TAVILY_API_KEY)
 
     async def analyze(self, market_data: dict[str, Any]) -> DerivativesAnalysis | None:
         """
@@ -105,22 +107,25 @@ class ResearchAnalyzer:
         return f"{params} derivatives market sentiment options flow cftc positioning"
 
     async def search_web(self, query: str) -> list[dict[str, str]]:
-        """Perplexity web search."""
-        if not self.config.PERPLEXITY_API_KEY:
-            logger.warning("No PERPLEXITY_API_KEY")
+        """Tavily web search."""
+        if not self.config.TAVILY_API_KEY:
+            logger.warning("No TAVILY_API_KEY")
             return []
 
         try:
+            results = await self.tavily.search(query=query, max_results=5)
+            # Normalize to list of dicts with url, title, snippet (content)
             return [
-                {"url": c, "snippet": f"Citation {i + 1}", "title": f"Source {i + 1}"}
-                for i, c in enumerate(citations)
+                {
+                    "url": r.get("url", ""),
+                    "title": r.get("title", ""),
+                    "snippet": r.get("content", "")[:300],  # Truncate content for snippet
+                }
+                for r in results.get("results", [])
             ]
-            # Note: Real Perplexity 'sonar' models return text response with citations.
-            # We can also use it as the "Research" step directly.
-            # Ideally we want snippets. The chat completion might not give structured snippets.
-            # But let's assume we treat the whole text as one big result or parse citations.
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"Search failed: {e}")
             return []
 
     def _create_fallback_analysis(self, market_data: dict[str, Any]) -> DerivativesAnalysis:

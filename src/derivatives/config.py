@@ -21,7 +21,8 @@ class DerivativesConfig:
     NASDAQ_DATA_LINK_API_KEY: str = os.getenv("NASDAQ_DATA_LINK_API_KEY", "")
 
     # AI Configuration matches existing project patterns
-    PERPLEXITY_API_KEY: str = os.getenv("PERPLEXITY_API_KEY", "")
+    # AI Configuration matches existing project patterns
+    TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
     ZAI_API_KEY: str = os.getenv("ZAI_API_KEY", "")
 
     # Notification
