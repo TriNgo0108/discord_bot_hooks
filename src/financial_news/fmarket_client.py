@@ -176,7 +176,7 @@ class FmarketClient:
         }
 
     def get_top_funds(
-        self, limit: int = 10, include_holdings: bool = False
+        self, limit: int = 20, include_holdings: bool = False
     ) -> list[dict[str, Any]]:
         """
         Fetch top performing funds from Fmarket.
@@ -228,30 +228,60 @@ class FmarketClient:
 
     def get_gold_prices(self) -> dict[str, Any]:
         """
-        Fetch gold prices from Fmarket API.
+        Fetch gold prices from Fmarket API (Last 30 days).
         """
         url = f"{self.BASE_URL}/get-price-gold-history"
 
         now = datetime.datetime.now()
-        date_str = now.strftime("%Y%m%d")
+        to_date_str = now.strftime("%Y%m%d")
+        from_date = now - datetime.timedelta(days=30)
+        from_date_str = from_date.strftime("%Y%m%d")
 
-        payload = {"fromDate": date_str, "toDate": date_str, "isAllData": False}
+        payload = {"fromDate": from_date_str, "toDate": to_date_str, "isAllData": False}
 
         try:
             response = self.client.post(url, json=payload)
             response.raise_for_status()
             data = response.json()
 
-            extra = data.get("extra", {})
+            # data['data'] contains list of history if range > 1 day?
+            # Based on API name 'get-price-gold-history', it likely returns a list in 'data' or 'rows'
+            # Let's check the structure assuming it returns a list of daily records.
+            # If it's a single object in 'extra' for today, we might need to look at 'data' for history.
 
-            return {
-                "sjc_buy": extra.get("priceBuy"),
-                "sjc_sell": extra.get("priceSell"),
-                "ring_buy": extra.get("goldRingPriceBuy"),
-                "ring_sell": extra.get("goldRingPriceSell"),
-                "world_gold": extra.get("ratePriceGoldWorldToVND"),
-                "usd_vnd": extra.get("rateUsdToVnd"),
+            # Common Fmarket pattern: data['data'] is the main payload.
+            # For history endpoint:
+            # If we request a range, 'data' should be a list of daily prices.
+            # 'extra' might still have the very latest real-time snapshot or summary.
+
+            result = {
+                "sjc_buy": 0,
+                "sjc_sell": 0,
+                "ring_buy": 0,
+                "ring_sell": 0,
+                "world_gold": 0,
+                "usd_vnd": 0,
+                "history": [],
             }
+
+            if "extra" in data:
+                extra = data["extra"]
+                result.update(
+                    {
+                        "sjc_buy": extra.get("priceBuy"),
+                        "sjc_sell": extra.get("priceSell"),
+                        "ring_buy": extra.get("goldRingPriceBuy"),
+                        "ring_sell": extra.get("goldRingPriceSell"),
+                        "world_gold": extra.get("ratePriceGoldWorldToVND"),
+                        "usd_vnd": extra.get("rateUsdToVnd"),
+                    }
+                )
+
+            if "data" in data and isinstance(data["data"], list):
+                result["history"] = data["data"]
+
+            return result
+
         except Exception as e:
             logger.error(f"Error fetching gold prices: {e}")
             return {}

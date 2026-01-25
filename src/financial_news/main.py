@@ -51,7 +51,7 @@ def main():
     logger.info(f"Fetched {len(fmarket_news)} Fmarket news items.")
 
     # Fetch Market Data
-    top_funds = fmarket_client.get_top_funds(limit=5, include_holdings=True)
+    top_funds = fmarket_client.get_top_funds(limit=20, include_holdings=True)
     watchlist_funds = fmarket_client.get_funds_by_codes(
         ["DCDS", "DCDE", "BVFED", "VESAF", "SSISCA", "E1VFVN30"]
     )

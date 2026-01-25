@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import time
@@ -19,7 +20,8 @@ Generate a daily briefing for Vietnamese retail investors based on market data a
 ## Analysis Framework (Think step-by-step)
 
 ### Step 1: Market Snapshot
-Analyze VN30 index trend, gold prices (SJC vs world), USD/VND movement, and fund performance.
+Analyze VN30 index trend, gold prices (SJC vs World, 30-day trend), USD/VND movement, and fund performance.
+*Specifically analyze the spread between SJC and World Gold. Is it widening or narrowing?*
 
 ### Step 2: VN30 Stock Analysis
 Identify notable stocks from fund holdings. Note concentration patterns and sector rotation.
@@ -29,37 +31,36 @@ Group news by theme (macro, sectors, company-specific). Identify bullish/bearish
 
 ### Step 4: Investment Suggestions
 Give 2-3 specific, actionable recommendations with price levels when possible. Include risk warnings.
+*If the Gold/World spread is low (< 3M VND), consider suggesting Gold accumulation. If high (> 5M VND), warn about risk.*
 
 ---
 
 ## Example Output
 
 **📊 Tổng Quan Thị Trường**
-VN30 tăng nhẹ 0.3% lên 1,245 điểm trong phiên giao dịch hôm nay. Thanh khoản đạt 15,000 tỷ. Vàng SJC ổn định quanh 92tr/lượng, chênh lệch với giá thế giới thu hẹp. Tỷ giá USD/VND đi ngang ở 25,450.
+VN30 tăng nhẹ 0.3% lên 1,245 điểm. Vàng SJC ổn định quanh 82tr/lượng, chênh lệch với thế giới thu hẹp còn 3 triệu đồng - mức hấp dẫn để tích lũy. Tỷ giá USD/VND đi ngang.
 
 **📈 Phân Tích VN30**
 - FPT và VIC chiếm 25% danh mục các quỹ top → Dòng tiền tập trung công nghệ & BĐS
 - HPG giảm tỷ trọng trong quỹ DCDS → Tín hiệu thận trọng với ngành thép
-- VCB duy trì vị thế số 1 trong nhóm ngân hàng
 
 **📰 Tin Nổi Bật**
 - **Macro**: Fed giữ nguyên lãi suất → dòng vốn ngoại có thể quay lại EM
-- **Ngân hàng**: BIDV công bố lãi Q4 vượt kỳ vọng 15%, NIM cải thiện
-- **Bất động sản**: Luật Đất đai mới có hiệu lực tháng 1, kỳ vọng tháo gỡ pháp lý
+- **Ngân hàng**: BIDV công bố lãi Q4 vượt kỳ vọng 15%
 
 **💡 Khuyến Nghị**
-1. **Mua**: FPT (momentum tốt, quỹ ngoại mua ròng, target 145k)
-2. **Theo dõi**: VCB (chờ điều chỉnh về vùng hỗ trợ 88k để tích lũy)
-3. **Rủi ro lưu ý**: Tỷ giá có thể gây áp lực nếu Fed hawkish trở lại
+1. **Mua**: FPT (target 145k)
+2. **Tích sản**: Vàng nhẫn trơn (Spread thấp, rủi ro thấp hơn SJC)
+3. **Rủi ro**: Tỷ giá có thể gây áp lực ngắn hạn
 
 ---
 
 ## Self-Verification Checklist
 Before responding, verify:
 - [ ] All numbers come from provided data (do not fabricate)
-- [ ] Recommendations mention specific stock codes
-- [ ] At least one risk warning is included
+- [ ] Recommendations mention specific codes or assets
 - [ ] Output is 100% Vietnamese
+- [ ] Gold analysis is included if data is present
 
 ## Output Requirements
 - **Language**: Vietnamese (Tiếng Việt)
@@ -189,14 +190,39 @@ class NewsSummarizer:
                 )
                 parts.append(f"Top Losers: {loser_str}")
 
-        # Gold Prices
+        # Gold Prices & History
         if "gold_prices" in market_stats and market_stats["gold_prices"]:
             g = market_stats["gold_prices"]
             parts.append(
-                f"Gold: SJC {g.get('sjc_buy')}/{g.get('sjc_sell')}, "
+                f"Market Gold Rates (Latest): SJC {g.get('sjc_buy')}/{g.get('sjc_sell')}, "
                 f"Ring {g.get('ring_buy')}/{g.get('ring_sell')}, "
                 f"World: {g.get('world_gold')}, USD/VND: {g.get('usd_vnd')}"
             )
+
+            # Format History Logic
+            history = g.get("history", [])
+            if history:
+                # History items have keys: reportDate (ms timestamp), askSjc, bidSjc
+                # Sort by date
+                history.sort(key=lambda x: x.get("reportDate", 0))
+
+                # Helper to format date and price
+                def fmt_item(item):
+                    ts = item.get("reportDate", 0)
+                    date_str = "N/A"
+                    if ts:
+                        # timestamp in ms
+                        dt = datetime.datetime.fromtimestamp(ts / 1000)
+                        date_str = dt.strftime("%Y-%m-%d")
+
+                    price = item.get("askSjc")
+                    price_str = f"{price:,.0f}" if price else "N/A"
+                    return f"{date_str}: {price_str}"
+
+                start = history[0]
+                end = history[-1]
+
+                parts.append(f"Gold 30-Day Trend (SJC Sell): {fmt_item(start)} -> {fmt_item(end)}")
 
         # Watchlist Funds
         if "watchlist_funds" in market_stats and market_stats["watchlist_funds"]:
