@@ -4,7 +4,7 @@ Stock client for fetching Vietnam stock prices using DSC Securities API.
 
 import datetime
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from .dsc_client import DSCClient

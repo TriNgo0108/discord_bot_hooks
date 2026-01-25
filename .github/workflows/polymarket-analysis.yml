@@ -29,6 +29,8 @@ jobs:
   analyze:
     name: Analyze Polymarket
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository

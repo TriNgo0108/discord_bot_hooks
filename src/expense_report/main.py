@@ -78,8 +78,9 @@ def send_discord_webhook(message):
 
     data = {"content": message}
 
-    response = httpx.post(DISCORD_WEBHOOK_URL, json=data)
-    response.raise_for_status()
+    with httpx.Client() as client:
+        response = client.post(DISCORD_WEBHOOK_URL, json=data)
+        response.raise_for_status()
     print(f"Sent message to Discord. Status: {response.status_code}")
 
 

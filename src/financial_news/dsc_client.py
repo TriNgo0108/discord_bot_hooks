@@ -349,7 +349,7 @@ class DSCClient:
     def _fetch_all_industries(self):
         """Fetch industry mapping."""
         try:
-            url = f"https://trading.dsc.com.vn/userdata/industry"
+            url = "https://trading.dsc.com.vn/userdata/industry"
             response = self.client.get(url)
             if response.status_code == 200:
                 data = response.json()

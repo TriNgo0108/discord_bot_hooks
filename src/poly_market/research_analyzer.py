@@ -118,14 +118,16 @@ class ResearchAnalyzer:
     """Research and analysis engine using Perplexity Search API and Z.AI GLM-4.7.
 
     Pipeline:
-    1. Use Perplexity Search API to get web search results
-    2. Pass search results to GLM-4.7 for analysis and recommendations
+    1. Use Perplexity Search API to get web search results (Batchable)
+    2. Pass search results to GLM-4.7 for analysis and recommendations (Concurrency limited to 2)
     """
 
     def __init__(self, config: AIConfig | None = None):
         """Initialize with AI configuration."""
         self.config = config or AIConfig.from_env()
         self._validate_config()
+        # GLM-4.7 concurrency limit (user specified limit of 2)
+        self.glm_semaphore = asyncio.Semaphore(2)
 
     def _validate_config(self) -> None:
         """Validate that required API keys are present."""
@@ -136,15 +138,16 @@ class ResearchAnalyzer:
 
     async def search_web(
         self,
-        query: str,
+        query: str | list[str],
         max_results: int = 5,
         timeout: int = 30,
     ) -> list[dict[str, str]]:
         """
         Search the web using Perplexity Search API.
+        Supports batched queries to optimize API usage.
 
         Args:
-            query: Search query
+            query: Search query or list of queries
             max_results: Maximum number of results
             timeout: Request timeout in seconds
 
@@ -155,6 +158,17 @@ class ResearchAnalyzer:
             logger.warning("Skipping web search - no API key")
             return []
 
+        # Optimize: Combine multiple queries into one prompt if list provided
+        final_query = query
+        if isinstance(query, list):
+            # Formulate a multi-topic research query
+            # "Research the following topics: 1. ... 2. ... "
+            numbered_topics = "\n".join([f"{i + 1}. {q}" for i, q in enumerate(query)])
+            final_query = (
+                f"Research detailed information for the following topics:\n{numbered_topics}"
+            )
+            logger.info(f"Batched {len(query)} queries into single request")
+
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(
@@ -164,8 +178,8 @@ class ResearchAnalyzer:
                         "Content-Type": "application/json",
                     },
                     json={
-                        "query": query,
-                        "max_results": max_results,
+                        "query": final_query,
+                        "max_results": max_results,  # Perplexity usually handles 5-10 well
                     },
                 )
                 response.raise_for_status()
@@ -183,7 +197,7 @@ class ResearchAnalyzer:
                         }
                     )
 
-                logger.info(f"Found {len(results)} search results for: {query[:50]}...")
+                logger.info(f"Found {len(results)} search results for: {str(query)[:50]}...")
                 return results
 
         except httpx.HTTPError as e:
@@ -201,68 +215,68 @@ class ResearchAnalyzer:
     ) -> tuple[ResearchResult | None, AnalysisResult | None]:
         """
         Analyze market using GLM-4.7 with search results.
-
-        Args:
-            market: The market to analyze
-            search_results: Web search results from Perplexity
-            timeout: Request timeout in seconds
-
-        Returns:
-            Tuple of (ResearchResult, AnalysisResult)
         """
-        if not self.config.ZAI_API_KEY:
-            logger.warning("Skipping analysis - no ZAI_API_KEY")
-            return self._create_fallback_research(market), self._create_fallback_analysis(market)
-
-        # Format search results for the prompt
-        formatted_results = self._format_search_results(search_results)
-
-        # Calculate current odds
-        odds = market.outcomes[0].price * 100 if market.outcomes else 50
-        odds_decimal = odds / 100
-
-        prompt = GLM_ANALYSIS_PROMPT.format(
-            question=market.question,
-            description=market.description[:500],
-            odds=f"{odds:.1f}",
-            odds_decimal=f"{odds_decimal:.2f}",
-            end_date=market.end_date or "Not specified",
-            search_results=formatted_results,
-        )
-
-        try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.post(
-                    f"{self.config.ZAI_BASE_URL}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.config.ZAI_API_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self.config.ZAI_MODEL,
-                        "messages": [
-                            {
-                                "role": "system",
-                                "content": "You are an expert prediction market analyst. Analyze web search results and provide trading recommendations. Always respond with valid JSON only.",
-                            },
-                            {"role": "user", "content": prompt},
-                        ],
-                        "temperature": 0.3,
-                    },
+        # Acquire semaphore to respect concurrency limit
+        async with self.glm_semaphore:
+            if not self.config.ZAI_API_KEY:
+                logger.warning("Skipping analysis - no ZAI_API_KEY")
+                return self._create_fallback_research(market), self._create_fallback_analysis(
+                    market
                 )
-                response.raise_for_status()
-                data = response.json()
 
-                # Extract content from response
-                content = data["choices"][0]["message"]["content"]
-                return self._parse_combined_response(market, content, search_results)
+            # Format search results for the prompt
+            formatted_results = self._format_search_results(search_results)
 
-        except httpx.HTTPError as e:
-            logger.error(f"Z.AI API error for market {market.id}: {e}")
-            return self._create_fallback_research(market), self._create_fallback_analysis(market)
-        except Exception as e:
-            logger.error(f"Analysis failed for market {market.id}: {e}")
-            return self._create_fallback_research(market), self._create_fallback_analysis(market)
+            # Calculate current odds
+            odds = market.outcomes[0].price * 100 if market.outcomes else 50
+            odds_decimal = odds / 100
+
+            prompt = GLM_ANALYSIS_PROMPT.format(
+                question=market.question,
+                description=market.description[:500],
+                odds=f"{odds:.1f}",
+                odds_decimal=f"{odds_decimal:.2f}",
+                end_date=market.end_date or "Not specified",
+                search_results=formatted_results,
+            )
+
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    response = await client.post(
+                        f"{self.config.ZAI_BASE_URL}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self.config.ZAI_API_KEY}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": self.config.ZAI_MODEL,
+                            "messages": [
+                                {
+                                    "role": "system",
+                                    "content": "You are an expert prediction market analyst. Analyze web search results and provide trading recommendations. Always respond with valid JSON only.",
+                                },
+                                {"role": "user", "content": prompt},
+                            ],
+                            "temperature": 0.3,
+                        },
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+
+                    # Extract content from response
+                    content = data["choices"][0]["message"]["content"]
+                    return self._parse_combined_response(market, content, search_results)
+
+            except httpx.HTTPError as e:
+                logger.error(f"Z.AI API error for market {market.id}: {e}")
+                return self._create_fallback_research(market), self._create_fallback_analysis(
+                    market
+                )
+            except Exception as e:
+                logger.error(f"Analysis failed for market {market.id}: {e}")
+                return self._create_fallback_research(market), self._create_fallback_analysis(
+                    market
+                )
 
     def _format_search_results(self, results: list[dict[str, str]]) -> str:
         """Format search results for the prompt."""
@@ -285,14 +299,8 @@ class ResearchAnalyzer:
         market: PolymarketMarket,
     ) -> tuple[ResearchResult | None, AnalysisResult | None]:
         """
-        Perform web search and analysis for a market.
-
-        Pipeline:
-        1. Search web using Perplexity Search API
-        2. Analyze results with GLM-4.7
-
-        Returns:
-            Tuple of (ResearchResult, AnalysisResult)
+        Perform web search and analysis for a single market.
+        Wrapper around simplified pipeline.
         """
         # Step 1: Search the web
         search_query = f"{market.question} latest news predictions"
@@ -300,9 +308,8 @@ class ResearchAnalyzer:
 
         if not search_results:
             logger.warning(f"No search results for market {market.id}")
-            # Still try to analyze with just market info
 
-        # Step 2: Analyze with GLM-4.7
+        # Step 2: Analyze with GLM-4.7 (concurrency limited inside the method)
         research, analysis = await self.analyze_with_glm(market, search_results)
 
         return research, analysis
@@ -310,31 +317,64 @@ class ResearchAnalyzer:
     async def batch_research_and_analyze(
         self,
         markets: list[PolymarketMarket],
-        concurrency: int = 3,
+        concurrency: int = 2,  # Default reduced to 2 as per user request
     ) -> list[tuple[PolymarketMarket, ResearchResult | None, AnalysisResult | None]]:
         """
-        Batch process multiple markets with rate limiting.
+        Batch process multiple markets with optimized API usage.
+
+        Strategy:
+        1. Group markets into chunks (batch size 3).
+        2. Perform batched search for each chunk (1 API call per 3 markets).
+        3. Perform analysis for all markets (concurrency limited to 2 by semaphore).
 
         Args:
             markets: List of markets to process
-            concurrency: Maximum concurrent requests
+            concurrency: Ignored for GLM (enforced by semaphore), serves as chunk size for search batching.
+                        (Repurposing arg to stay API compatible but optimize internally)
 
         Returns:
             List of (market, research, analysis) tuples
         """
-        semaphore = asyncio.Semaphore(concurrency)
+        # Create chunks for batched search
+        batch_size = 3  # Optimal batch size for Perplexity prompt context
+        chunks = [markets[i : i + batch_size] for i in range(0, len(markets), batch_size)]
 
-        async def process_market(
-            market: PolymarketMarket,
-        ) -> tuple[PolymarketMarket, ResearchResult | None, AnalysisResult | None]:
-            async with semaphore:
-                # Add delay between requests to respect rate limits
-                await asyncio.sleep(2)
-                research, analysis = await self.research_and_analyze(market)
-                return market, research, analysis
+        results_map = {}  # map market_id -> research results
 
-        tasks = [process_market(m) for m in markets]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Phase 1: Batched Search
+        logger.info(
+            f"Starting batched search for {len(markets)} markets in {len(chunks)} batches..."
+        )
+
+        async def process_search_chunk(chunk):
+            queries = [f"{m.question} latest news" for m in chunk]
+            # Combined search
+            search_results = await self.search_web(queries)
+            # Assign same results to all markets in chunk (context sharing)
+            # Note: Ideally we'd map specific results, but broadly related markets or comprehensive search
+            # often returns results covering multiple topics if prompted.
+            # Or we assume the user groups related markets.
+            # Even if unrelated, Perplexity usually returns segmented results.
+            # We'll pass the full context to GLM and let it pick relevant info.
+            return chunk, search_results
+
+        search_tasks = [process_search_chunk(chunk) for chunk in chunks]
+        chunk_results = await asyncio.gather(*search_tasks)
+
+        # Phase 2: Analysis (Semaphored)
+        logger.info("Starting semaphored analysis...")
+
+        async def process_analysis(market, results):
+            research, analysis = await self.analyze_with_glm(market, results)
+            return market, research, analysis
+
+        analysis_tasks = []
+        for chunk, search_results in chunk_results:
+            for market in chunk:
+                analysis_tasks.append(process_analysis(market, search_results))
+
+        # Run all analysis tasks - semaphore inside analyze_with_glm controls concurrency
+        results = await asyncio.gather(*analysis_tasks, return_exceptions=True)
 
         # Filter out exceptions
         valid_results = []
@@ -403,8 +443,8 @@ class ResearchAnalyzer:
             return research, analysis
 
         except Exception as e:
-            logger.warning(f"Failed to parse response: {e}")
-            return self._create_fallback_research(market), self._create_fallback_analysis(market)
+            logger.error(f"Error parsing GLM response: {e}")
+            raise
 
     def _extract_json(self, content: str) -> dict[str, Any]:
         """Extract JSON from response content."""

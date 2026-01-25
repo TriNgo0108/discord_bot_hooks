@@ -1,0 +1,33 @@
+name: Derivatives Market Analysis
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r src/derivatives/requirements.txt
+
+      - name: Run Analysis
+        env:
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          DISCORD_WEBHOOK_DERIVATIVES: ${{ secrets.DISCORD_WEBHOOK_DERIVATIVES }}
+        run: |
+          python -m src.derivatives.main --instruments "VN30F1M,VN30F2M"

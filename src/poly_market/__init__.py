@@ -1,6 +1,6 @@
 """Polymarket integration module."""
 
-from .config import AIConfig, POLYMARKET_CONFIG, PolymarketConfig
+from .config import POLYMARKET_CONFIG, AIConfig, PolymarketConfig
 from .models import (
     AnalysisResult,
     MarketOutcome,

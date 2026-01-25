@@ -226,11 +226,6 @@ def main() -> None:
         default=None,
         help="Output JSON file path",
     )
-    parser.add_argument(
-        "--discord",
-        action="store_true",
-        help="Send results to Discord webhook",
-    )
 
     args = parser.parse_args()
 
@@ -246,7 +241,8 @@ def main() -> None:
     )
 
     # Send Discord notification if requested
-    if args.discord and suggestions:
+    # Send Discord notification (always attempts if suggestions exist)
+    if suggestions:
         asyncio.run(send_discord_notification(suggestions))
 
     # Exit with appropriate code
