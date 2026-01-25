@@ -31,7 +31,7 @@ class AIConfig:
     # Z.AI (ZhipuAI) settings - GLM-4.7
     ZAI_API_KEY: str = ""
     ZAI_MODEL: str = "glm-4.7"
-    ZAI_BASE_URL: str = " https://api.z.ai/api/coding/paas/v4"
+    ZAI_BASE_URL: str = "https://api.z.ai/api/coding/paas/v4"
 
     # Perplexity Search API settings (web search only)
     PERPLEXITY_API_KEY: str = ""

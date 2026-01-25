@@ -27,5 +27,6 @@ jobs:
           DISCORD_WEBHOOK_FINANCE: ${{ secrets.DISCORD_WEBHOOK_FINANCE }}
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
           WEBSEARCH_API_KEY: ${{ secrets.WEBSEARCH_API_KEY }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
         run: |
           python -m src.financial_news.main

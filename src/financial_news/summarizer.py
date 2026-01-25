@@ -153,8 +153,14 @@ class NewsSummarizer:
         """Format all market data into a single string for the prompt."""
         parts = []
 
-        # VN30 Index
-        if "vn30_index" in market_stats and market_stats["vn30_index"]:
+        # VN30 Current Index (Real-time)
+        if "vn30_current" in market_stats and market_stats["vn30_current"]:
+            vn30 = market_stats["vn30_current"]
+            parts.append(
+                f"VN30 Index: {vn30.get('current', 0):,.2f} ({vn30.get('change_percent', 0):+.2f}%), Volume: {vn30.get('volume', 0):,}"
+            )
+        # Fallback to historical data if current not available
+        elif "vn30_index" in market_stats and market_stats["vn30_index"]:
             vn30_data = market_stats["vn30_index"]
             if len(vn30_data) >= 2:
                 latest = vn30_data[-1]
@@ -164,6 +170,24 @@ class NewsSummarizer:
                 parts.append(
                     f"VN30 Index: {latest['close']:,.2f} ({change_pct:+.2f}%), Volume: {latest['volume']:,}"
                 )
+
+        # Top Movers
+        if "top_movers" in market_stats and market_stats["top_movers"]:
+            movers = market_stats["top_movers"]
+            gainers = movers.get("gainers", [])[:3]
+            losers = movers.get("losers", [])[:3]
+
+            if gainers:
+                gainer_str = ", ".join(
+                    [f"{g['symbol']} ({g['change_percent']:+.2f}%)" for g in gainers]
+                )
+                parts.append(f"Top Gainers: {gainer_str}")
+
+            if losers:
+                loser_str = ", ".join(
+                    [f"{l['symbol']} ({l['change_percent']:+.2f}%)" for l in losers]
+                )
+                parts.append(f"Top Losers: {loser_str}")
 
         # Gold Prices
         if "gold_prices" in market_stats and market_stats["gold_prices"]:
@@ -198,6 +222,23 @@ class NewsSummarizer:
         if "vn30_symbols" in market_stats and market_stats["vn30_symbols"]:
             symbols = market_stats["vn30_symbols"][:10]
             parts.append(f"VN30 Components: {', '.join(symbols)}")
+
+        # Perplexity AI Context (Web Research)
+        if "perplexity_context" in market_stats and market_stats["perplexity_context"]:
+            ctx = market_stats["perplexity_context"]
+            context_parts = []
+
+            if ctx.get("vn30_context"):
+                context_parts.append(f"**VN30 Analysis (AI):**\n{ctx['vn30_context']}")
+
+            if ctx.get("stocks_context"):
+                context_parts.append(f"**Top Stocks Analysis (AI):**\n{ctx['stocks_context']}")
+
+            if ctx.get("funds_context"):
+                context_parts.append(f"**Fund Analysis (AI):**\n{ctx['funds_context']}")
+
+            if context_parts:
+                parts.append("\n---\n**Web Research Context:**\n" + "\n\n".join(context_parts))
 
         return "\n\n".join(parts) if parts else "Market data unavailable"
 

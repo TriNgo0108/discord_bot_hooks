@@ -197,6 +197,28 @@ class StockClient:
         logger.warning("VN30 index history temporarily unavailable with DSC client")
         return []
 
+    def get_vn30_index(self) -> dict[str, Any]:
+        """
+        Get VN30 index current value and change.
+
+        Returns:
+            Dictionary with current, reference, change, change_percent, volume.
+        """
+        try:
+            index_data = self.dsc_client.get_index_data("HOSE,30")
+            vn30 = index_data.get("VN30")
+            if vn30:
+                return {
+                    "current": vn30.current,
+                    "reference": vn30.reference,
+                    "change": vn30.change,
+                    "change_percent": vn30.change_percent,
+                    "volume": vn30.volume,
+                }
+        except Exception as e:
+            logger.error(f"Error fetching VN30 index: {e}")
+        return {}
+
     def get_vn30_top_movers(self, limit: int = 5) -> dict[str, list[dict[str, Any]]]:
         """
         Get top gainers and losers among VN30 stocks.
