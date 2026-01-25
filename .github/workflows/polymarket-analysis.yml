@@ -58,8 +58,7 @@ jobs:
             --markets ${{ github.event.inputs.max_markets || '3' }} \
             --confidence ${{ github.event.inputs.min_confidence || '5' }} \
             --edge ${{ github.event.inputs.min_edge || '0.10' }} \
-            --output results/polymarket_$(date +%Y%m%d_%H%M%S).json \
-            --discord
+            --output results/polymarket_$(date +%Y%m%d_%H%M%S).json
 
       - name: Upload results
         uses: actions/upload-artifact@v4
