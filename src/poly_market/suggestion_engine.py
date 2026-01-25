@@ -1,7 +1,7 @@
 """Suggestion engine for generating trading recommendations."""
 
 import logging
-from typing import Generator
+from collections.abc import Generator
 
 from .models import (
     AnalysisResult,

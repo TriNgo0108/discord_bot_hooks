@@ -8,20 +8,15 @@ import time
 from email.header import decode_header
 
 import httpx
-from google import genai
 
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_GMAIL")
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-
-_gemini_client = None
-if GEMINI_API_KEY:
-    try:
-        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-    except Exception as e:
-        print(f"Failed to initialize Gemini client: {e}")
+# Z.AI (GLM-4.7) configuration
+ZAI_API_KEY = os.getenv("ZAI_API_KEY")
+ZAI_BASE_URL = os.getenv("ZAI_BASE_URL", "https://api.z.ai/api/coding/paas/v4")
+ZAI_MODEL = os.getenv("ZAI_MODEL", "glm-4.7")
 
 
 # =============================================================================
@@ -71,9 +66,9 @@ OUTPUT:
 
 
 def summarize_content(text):
-    """Summarize text using Gemini with optimized prompt and retry logic."""
-    if not _gemini_client:
-        print("Gemini client not initialized. Skipping summarization.")
+    """Summarize text using Z.AI GLM-4.7 with optimized prompt and retry logic."""
+    if not ZAI_API_KEY:
+        print("ZAI_API_KEY not set. Skipping summarization.")
         return None
 
     # Truncate very long emails to avoid token limits
@@ -87,10 +82,29 @@ def summarize_content(text):
 
     for attempt in range(max_retries):
         try:
-            response = _gemini_client.models.generate_content(
-                model="gemini-2.5-flash-lite", contents=prompt
+            response = httpx.post(
+                f"{ZAI_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {ZAI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": ZAI_MODEL,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are an executive assistant extracting decision-critical info from emails. Be concise and actionable.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "max_tokens": 1024,
+                    "temperature": 0.3,
+                },
+                timeout=60,
             )
-            return response.text.strip()
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"].strip()
 
         except Exception as e:
             if attempt == max_retries - 1:

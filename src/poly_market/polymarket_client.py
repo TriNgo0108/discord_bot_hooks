@@ -2,8 +2,8 @@
 
 import asyncio
 import logging
+from collections.abc import AsyncGenerator
 from functools import lru_cache
-from typing import AsyncGenerator
 
 import httpx
 

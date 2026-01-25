@@ -2,7 +2,6 @@ name: Daily Gmail Summary
 
 on:
   schedule:
-    # 00:20 UTC = 07:20 UTC+7 (Vietnam time)
     - cron: "0 0 * * *"
   workflow_dispatch:
 
@@ -28,5 +27,5 @@ jobs:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           DISCORD_WEBHOOK_GMAIL: ${{ secrets.DISCORD_WEBHOOK_GMAIL }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
         run: python src/gmail_reader/main.py

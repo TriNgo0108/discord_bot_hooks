@@ -2,7 +2,6 @@ name: Daily Expense Report
 
 on:
   schedule:
-    # 13:10 UTC = 20:10 UTC+7 (Vietnam time)
     - cron: "10 13 * * *"
   workflow_dispatch:
 

@@ -7,8 +7,8 @@ import os
 import sys
 from datetime import datetime
 
-from .config import AIConfig, POLYMARKET_CONFIG
-from .models import PolymarketEvent, TradingSuggestion
+from .config import AIConfig
+from .models import TradingSuggestion
 from .polymarket_client import PolymarketClient
 from .research_analyzer import ResearchAnalyzer
 from .suggestion_engine import SuggestionEngine
@@ -141,7 +141,7 @@ async def send_discord_notification(
     webhook_url: str | None = None,
 ) -> None:
     """Send suggestions to Discord webhook."""
-    webhook_url = webhook_url or os.getenv("DISCORD_WEBHOOK_URL")
+    webhook_url = webhook_url or os.getenv("DISCORD_WEBHOOK_POLYMARKET")
 
     if not webhook_url:
         logger.warning("No Discord webhook URL configured")
