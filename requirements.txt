@@ -4,3 +4,4 @@ python-dotenv
 beautifulsoup4
 playwright
 aiohttp>=3.9.0
+tenacity>=8.0.0

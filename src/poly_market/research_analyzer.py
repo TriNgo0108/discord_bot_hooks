@@ -11,6 +11,13 @@ import logging
 from typing import Any
 
 import httpx
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+    before_sleep_log,
+)
 
 from .config import AIConfig
 from .models import (
@@ -215,6 +222,7 @@ class ResearchAnalyzer:
     ) -> tuple[ResearchResult | None, AnalysisResult | None]:
         """
         Analyze market using GLM-4.7 with search results.
+        Uses tenacity for retry logic with exponential backoff.
         """
         # Acquire semaphore to respect concurrency limit
         async with self.glm_semaphore:
@@ -240,7 +248,14 @@ class ResearchAnalyzer:
                 search_results=formatted_results,
             )
 
-            try:
+            @retry(
+                retry=retry_if_exception_type(httpx.HTTPStatusError),
+                stop=stop_after_attempt(3),
+                wait=wait_exponential(multiplier=5, min=5, max=60),
+                before_sleep=before_sleep_log(logger, logging.WARNING),
+                reraise=True,
+            )
+            async def _call_zai_api() -> dict:
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     response = await client.post(
                         f"{self.config.ZAI_BASE_URL}/chat/completions",
@@ -261,12 +276,12 @@ class ResearchAnalyzer:
                         },
                     )
                     response.raise_for_status()
-                    data = response.json()
+                    return response.json()
 
-                    # Extract content from response
-                    content = data["choices"][0]["message"]["content"]
-                    return self._parse_combined_response(market, content, search_results)
-
+            try:
+                data = await _call_zai_api()
+                content = data["choices"][0]["message"]["content"]
+                return self._parse_combined_response(market, content, search_results)
             except httpx.HTTPError as e:
                 logger.error(f"Z.AI API error for market {market.id}: {e}")
                 return self._create_fallback_research(market), self._create_fallback_analysis(
