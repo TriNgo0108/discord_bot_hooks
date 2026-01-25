@@ -1,9 +1,10 @@
 """DuckDuckGo Search API Client."""
 
 import logging
+import warnings
 from typing import Any
 
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
@@ -71,7 +72,7 @@ class DDGClient:
                 with DDGS() as ddgs:
                     return list(
                         ddgs.text(
-                            keywords=query,
+                            query=query,
                             region="wt-wt",
                             safesearch="off",
                             timelimit=time_filter,

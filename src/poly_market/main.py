@@ -6,10 +6,9 @@ import logging
 import os
 import sys
 from datetime import datetime
-
 from pathlib import Path
 
-from .config import AIConfig, POLYMARKET_CONFIG
+from .config import POLYMARKET_CONFIG, AIConfig
 from .models import TradingSuggestion
 from .polymarket_client import PolymarketClient
 from .research_analyzer import ResearchAnalyzer
