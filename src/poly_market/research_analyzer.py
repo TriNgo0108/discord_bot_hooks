@@ -19,6 +19,8 @@ from tenacity import (
     wait_exponential,
 )
 
+from src.common.tavily_client import TavilyClient
+
 from .config import AIConfig
 from .models import (
     AnalysisResult,
@@ -202,11 +204,13 @@ class ResearchAnalyzer:
         self._validate_config()
         # GLM-4.7 concurrency limit (user specified limit of 2)
         self.glm_semaphore = asyncio.Semaphore(2)
+        # Initialize Tavily client
+        self.tavily = TavilyClient(api_key=self.config.TAVILY_API_KEY)
 
     def _validate_config(self) -> None:
         """Validate that required API keys are present."""
-        if not self.config.PERPLEXITY_API_KEY:
-            logger.warning("PERPLEXITY_API_KEY not set - web search will be limited")
+        if not self.config.TAVILY_API_KEY:
+            logger.warning("TAVILY_API_KEY not set - web search will be skipped")
         if not self.config.ZAI_API_KEY:
             logger.warning("ZAI_API_KEY not set - analysis will be limited")
 
@@ -217,8 +221,8 @@ class ResearchAnalyzer:
         timeout: int = 30,
     ) -> list[dict[str, str]]:
         """
-        Search the web using Perplexity Search API.
-        Supports batched queries to optimize API usage.
+        Search the web using Tavily API.
+        Supports batched queries by joining them.
 
         Args:
             query: Search query or list of queries
@@ -228,57 +232,42 @@ class ResearchAnalyzer:
         Returns:
             List of search results with title, url, snippet, date
         """
-        if not self.config.PERPLEXITY_API_KEY:
+        if not self.tavily.api_key:
             logger.warning("Skipping web search - no API key")
             return []
 
-        # Optimize: Combine multiple queries into one prompt if list provided
+        # Combine multiple queries if provided
         final_query = query
         if isinstance(query, list):
-            # Formulate a multi-topic research query
-            # "Research the following topics: 1. ... 2. ... "
-            numbered_topics = "\n".join([f"{i + 1}. {q}" for i, q in enumerate(query)])
-            final_query = (
-                f"Research detailed information for the following topics:\n{numbered_topics}"
-            )
-            logger.info(f"Batched {len(query)} queries into single request")
+            final_query = " ".join(query)
+            logger.info(f"Combined {len(query)} queries into single request")
 
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.post(
-                    f"{self.config.PERPLEXITY_BASE_URL}/search",
-                    headers={
-                        "Authorization": f"Bearer {self.config.PERPLEXITY_API_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "query": final_query,
-                        "max_results": max_results,  # Perplexity usually handles 5-10 well
-                    },
+            # Use Tavily with news filter (last 30 days)
+            # as requested by user logic
+            response = await self.tavily.search(
+                query=str(final_query),
+                max_results=max_results,
+                days=30,  # Filter for last 30 days news
+                include_raw_content=False,
+            )
+
+            results = []
+            for item in response.get("results", []):
+                results.append(
+                    {
+                        "title": item.get("title", ""),
+                        "url": item.get("url", ""),
+                        "snippet": item.get("content", ""),  # Tavily returns 'content'
+                        "date": item.get("published_date", ""),
+                    }
                 )
-                response.raise_for_status()
-                data = response.json()
 
-                # Extract results
-                results = []
-                for item in data.get("results", []):
-                    results.append(
-                        {
-                            "title": item.get("title", ""),
-                            "url": item.get("url", ""),
-                            "snippet": item.get("snippet", ""),
-                            "date": item.get("date", ""),
-                        }
-                    )
+            logger.info(f"Found {len(results)} search results for query")
+            return results
 
-                logger.info(f"Found {len(results)} search results for: {str(query)[:50]}...")
-                return results
-
-        except httpx.HTTPError as e:
-            logger.error(f"Perplexity Search API error: {e}")
-            return []
         except Exception as e:
-            logger.error(f"Web search failed: {e}")
+            logger.error(f"Tavily search failed: {e}")
             return []
 
     async def analyze_with_glm(

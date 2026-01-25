@@ -7,7 +7,9 @@ import os
 import sys
 from datetime import datetime
 
-from .config import AIConfig
+from pathlib import Path
+
+from .config import AIConfig, POLYMARKET_CONFIG
 from .models import TradingSuggestion
 from .polymarket_client import PolymarketClient
 from .research_analyzer import ResearchAnalyzer
@@ -21,12 +23,53 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def get_analyzed_event_ids(results_dir: str | None = None) -> set[str]:
+    """
+    Read all previously analyzed event IDs from the results folder.
+
+    Args:
+        results_dir: Path to results directory. Defaults to config RESULTS_DIR.
+
+    Returns:
+        Set of event IDs that have already been analyzed.
+    """
+    results_dir = results_dir or POLYMARKET_CONFIG.RESULTS_DIR
+    results_path = Path(results_dir)
+    analyzed_ids: set[str] = set()
+
+    if not results_path.exists():
+        logger.info(f"Results directory not found: {results_dir}")
+        return analyzed_ids
+
+    # Read all JSON files in results directory
+    for json_file in results_path.glob("polymarket_*.json"):
+        try:
+            with open(json_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            # Extract event IDs from suggestions
+            for suggestion in data.get("suggestions", []):
+                event_id = suggestion.get("event_id")
+                if event_id:
+                    analyzed_ids.add(str(event_id))
+
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Failed to read {json_file}: {e}")
+            continue
+
+    if analyzed_ids:
+        logger.info(f"Found {len(analyzed_ids)} previously analyzed event IDs")
+
+    return analyzed_ids
+
+
 async def analyze_polymarket(
     max_events: int = 10,
     max_markets: int = 3,
     min_confidence: int = 5,
     min_edge: float = 0.10,
     output_file: str | None = None,
+    skip_analyzed: bool = True,
 ) -> list[TradingSuggestion]:
     """
     Main entry point for Polymarket analysis.
@@ -43,6 +86,7 @@ async def analyze_polymarket(
         min_confidence: Minimum confidence score for suggestions
         min_edge: Minimum edge percentage for suggestions
         output_file: Optional path to save JSON results
+        skip_analyzed: Skip events that were already analyzed (default: True)
 
     Returns:
         List of TradingSuggestion objects
@@ -57,6 +101,9 @@ async def analyze_polymarket(
     analyzer = ResearchAnalyzer(ai_config)
     engine = SuggestionEngine(min_confidence=min_confidence, min_edge=min_edge)
 
+    # Load previously analyzed event IDs to exclude (if skip_analyzed is True)
+    analyzed_event_ids = get_analyzed_event_ids() if skip_analyzed else set()
+
     # Step 1: Fetch events
     logger.info("Step 1: Fetching events from Polymarket...")
     async with PolymarketClient() as client:
@@ -65,6 +112,18 @@ async def analyze_polymarket(
 
     if not events:
         logger.warning("No events found. Exiting.")
+        return []
+
+    # Filter out already-analyzed events
+    if analyzed_event_ids:
+        original_count = len(events)
+        events = [e for e in events if e.id not in analyzed_event_ids]
+        filtered_count = original_count - len(events)
+        if filtered_count > 0:
+            logger.info(f"Excluded {filtered_count} already-analyzed events")
+
+    if not events:
+        logger.info("All events have been previously analyzed. Nothing new to process.")
         return []
 
     # Step 2 & 3: Research and analyze each market
@@ -228,10 +287,14 @@ def main() -> None:
         default=None,
         help="Output JSON file path",
     )
+    parser.add_argument(
+        "--include-analyzed",
+        action="store_true",
+        help="Include previously analyzed events (by default they are excluded)",
+    )
 
     args = parser.parse_args()
 
-    # Run analysis
     suggestions = asyncio.run(
         analyze_polymarket(
             max_events=args.events,
@@ -239,6 +302,7 @@ def main() -> None:
             min_confidence=args.confidence,
             min_edge=args.edge,
             output_file=args.output,
+            skip_analyzed=not args.include_analyzed,
         )
     )
 

@@ -36,6 +36,7 @@ class TavilyClient:
         include_answer: bool = False,
         include_raw_content: bool = False,
         include_images: bool = False,
+        days: int | None = None,
     ) -> dict[str, Any]:
         """
         Perform a search using Tavily API.
@@ -49,6 +50,8 @@ class TavilyClient:
             include_answer: Whether to include a short answer.
             include_raw_content: Whether to include raw content.
             include_images: Whether to include images.
+            days: Number of days to filter results (sets topic to "news" automatically).
+                  E.g., days=30 returns news from the last 30 days.
 
         Returns:
             JSON response from Tavily API.
@@ -70,6 +73,9 @@ class TavilyClient:
             payload["include_domains"] = include_domains
         if exclude_domains:
             payload["exclude_domains"] = exclude_domains
+        if days is not None:
+            payload["topic"] = "news"
+            payload["days"] = days
 
         async with httpx.AsyncClient() as client:
             response = await client.post(self.BASE_URL, json=payload, timeout=30.0)
@@ -82,9 +88,17 @@ class TavilyClient:
         search_depth: str = "basic",
         max_results: int = 5,
         max_tokens: int = 4000,
+        days: int | None = None,
     ) -> str:
         """
         Get a context string suitable for LLM injection.
+
+        Args:
+            query: The search query.
+            search_depth: "basic" or "advanced".
+            max_results: Maximum number of results.
+            max_tokens: Maximum tokens for context (for future use).
+            days: Number of days to filter results (sets topic to "news" automatically).
         """
         if not self.api_key:
             return ""
@@ -94,6 +108,7 @@ class TavilyClient:
                 query=query,
                 search_depth=search_depth,
                 max_results=max_results,
+                days=days,
             )
 
             results = data.get("results", [])

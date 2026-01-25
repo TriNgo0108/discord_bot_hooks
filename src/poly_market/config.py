@@ -23,6 +23,9 @@ class PolymarketConfig:
     # Cache TTL in seconds
     CACHE_TTL: int = 300  # 5 minutes
 
+    # Results directory for excluding already-analyzed events
+    RESULTS_DIR: str = "results"
+
 
 @dataclass(frozen=True)
 class AIConfig:
@@ -37,6 +40,9 @@ class AIConfig:
     PERPLEXITY_API_KEY: str = ""
     PERPLEXITY_BASE_URL: str = "https://api.perplexity.ai"
 
+    # Tavily Search API
+    TAVILY_API_KEY: str = ""
+
     @classmethod
     def from_env(cls) -> "AIConfig":
         """Load configuration from environment variables."""
@@ -44,6 +50,7 @@ class AIConfig:
             ZAI_API_KEY=os.getenv("ZAI_API_KEY", ""),
             ZAI_MODEL=os.getenv("ZAI_MODEL", "glm-4.7"),
             PERPLEXITY_API_KEY=os.getenv("PERPLEXITY_API_KEY", ""),
+            TAVILY_API_KEY=os.getenv("TAVILY_API_KEY", ""),
         )
 
 
