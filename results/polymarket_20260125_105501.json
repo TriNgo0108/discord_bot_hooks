@@ -1,0 +1,58 @@
+{
+  "timestamp": "2026-01-25T11:14:43.469917",
+  "total_suggestions": 2,
+  "suggestions": [
+    {
+      "event_id": "35908",
+      "event_title": "Who will Trump nominate as Fed Chair?",
+      "market_id": "572469",
+      "market_question": "Will Trump nominate Kevin Warsh as the next Fed chair?",
+      "current_odds": 0.305,
+      "estimated_probability": 0.5,
+      "edge_percentage": 19.5,
+      "recommendation": "LONG",
+      "confidence": 8,
+      "reasoning": "The market odds of 30.5% appear significantly undervalued relative to the President's explicit public endorsement placing Warsh 'at the top of the list.' When a sitting President narrows the field to two 'leading contenders' and calls one the top of that list, the probability should arguably be above 50%, barring unforeseen scandals or withdrawal. The current price implies skepticism that Trump will follow through, but the direct verbal commitment provides strong alpha.",
+      "risk_factors": [
+        "Trump is known for changing his mind frequently.",
+        "Senate confirmation concerns regarding Warsh's past tenure or views could influence the final decision.",
+        "The possibility of an unexpected dark horse candidate emerging."
+      ],
+      "key_findings": [
+        "President Trump explicitly identified Kevin Warsh as being 'at the top of the list' for Fed Chair.",
+        "Trump referred to Warsh and Hassett as the 'two Kevins' and stated they are the leading contenders.",
+        "The comments were made in a December 2025 interview with the Wall Street Journal."
+      ],
+      "sources": [
+        "https://www.foxbusiness.com/politics/trump-suggests-warsh-hassett-leading-contenders-fed-chair-pick"
+      ],
+      "timestamp": "2026-01-25T11:14:43.469618"
+    },
+    {
+      "event_id": "35908",
+      "event_title": "Who will Trump nominate as Fed Chair?",
+      "market_id": "572470",
+      "market_question": "Will Trump nominate Kevin Hassett as the next Fed chair?",
+      "current_odds": 0.065,
+      "estimated_probability": 0.25,
+      "edge_percentage": 18.5,
+      "recommendation": "LONG",
+      "confidence": 7,
+      "reasoning": "At 6.5%, the market is severely underpricing Hassett's chances given he was named by Trump as a 'leading contender' alongside Warsh. In a binary or near-binary race defined by the President, the second-place named contender should have significantly higher odds than 6.5%. If the race is truly between the 'two Kevins' as Trump stated, Hassett serves as a strong hedge or primary value play if Warsh stumbles.",
+      "risk_factors": [
+        "He appears to be the 'runner-up' in Trump's eyes based on the 'top of the list' comment for Warsh.",
+        "His proximity to the administration might be viewed as a negative for Fed independence.",
+        "Market may be pricing in a potential different pick outside the two mentioned."
+      ],
+      "key_findings": [
+        "Trump named Hassett as one of two 'leading contenders' for the role.",
+        "Hassett currently serves as the National Economic Council Director.",
+        "Trump referred to Hassett and Warsh as the 'two Kevins' and called them both 'great'."
+      ],
+      "sources": [
+        "https://www.foxbusiness.com/politics/trump-suggests-warsh-hassett-leading-contenders-fed-chair-pick"
+      ],
+      "timestamp": "2026-01-25T11:14:43.469633"
+    }
+  ]
+}
