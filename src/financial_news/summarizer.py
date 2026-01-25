@@ -198,11 +198,11 @@ class NewsSummarizer:
                 f"World: {g.get('world_gold')}, USD/VND: {g.get('usd_vnd')}"
             )
 
-        # Top Funds
-        if "top_funds" in market_stats:
-            funds = market_stats["top_funds"]
+        # Watchlist Funds
+        if "watchlist_funds" in market_stats and market_stats["watchlist_funds"]:
+            funds = market_stats["watchlist_funds"]
             fund_lines = []
-            for f in funds[:5]:
+            for f in funds:
                 line = (
                     f"- {f['name']}: 6M {f.get('nav_6m', 0):.1f}%, 12M {f.get('nav_12m', 0):.1f}%"
                 )
@@ -211,7 +211,33 @@ class NewsSummarizer:
                     line += f" | Holdings: {', '.join(top_3)}"
                 fund_lines.append(line)
             if fund_lines:
-                parts.append("Top Funds:\n" + "\n".join(fund_lines))
+                parts.append("Watchlist Funds:\n" + "\n".join(fund_lines))
+
+        # Top Funds
+        if (
+            "top_funds" in market_stats and "watchlist_funds" not in market_stats
+        ):  # Show top funds only if no watchlist, or maybe show both? Let's show both but separate headers.
+            pass  # Logic below handles top_funds. logic above handles watchlist.
+
+        if "top_funds" in market_stats:
+            funds = market_stats["top_funds"]
+            fund_lines = []
+            for f in funds[:5]:
+                # Avoid duplicates if in watchlist
+                if "watchlist_funds" in market_stats and any(
+                    w["id"] == f["id"] for w in market_stats["watchlist_funds"]
+                ):
+                    continue
+
+                line = (
+                    f"- {f['name']}: 6M {f.get('nav_6m', 0):.1f}%, 12M {f.get('nav_12m', 0):.1f}%"
+                )
+                if "top_holdings" in f and f["top_holdings"]:
+                    top_3 = [h["stock_code"] for h in f["top_holdings"][:3]]
+                    line += f" | Holdings: {', '.join(top_3)}"
+                fund_lines.append(line)
+            if fund_lines:
+                parts.append("Top Performing Funds:\n" + "\n".join(fund_lines))
 
         # Bank Rates
         if "bank_rates" in market_stats and market_stats["bank_rates"]:

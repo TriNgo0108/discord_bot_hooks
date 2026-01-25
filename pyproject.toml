@@ -20,6 +20,7 @@ financial_news = [
 ]
 derivatives = [
     "vnstock>=0.2.0",
+    "pytz",
 ]
 expense_report = [
     "psycopg2-binary",

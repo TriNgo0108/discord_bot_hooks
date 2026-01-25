@@ -52,6 +52,11 @@ def main():
 
     # Fetch Market Data
     top_funds = fmarket_client.get_top_funds(limit=5, include_holdings=True)
+    watchlist_funds = fmarket_client.get_funds_by_codes(
+        ["DCDS", "DCDE", "BVFED", "VESAF", "SSISCA", "E1VFVN30"]
+    )
+    logger.info(f"Fetched {len(watchlist_funds)} watchlist funds.")
+
     gold_prices = fmarket_client.get_gold_prices()
     bank_rates = fmarket_client.get_bank_rates()
 
@@ -82,6 +87,7 @@ def main():
     # Build initial market stats
     market_stats = {
         "top_funds": top_funds,
+        "watchlist_funds": watchlist_funds,
         "gold_prices": gold_prices,
         "bank_rates": bank_rates,
         "vn30_index": vn30_index,

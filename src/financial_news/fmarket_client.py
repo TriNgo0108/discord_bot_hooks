@@ -94,6 +94,87 @@ class FmarketClient:
             logger.error(f"Error fetching fund detail for product {product_id}: {e}")
             return {}
 
+    def search_funds(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
+        """
+        Search for funds by name or code.
+        """
+        url = f"{self.BASE_URL}/products/filter"
+        payload = {
+            "types": ["NEW_FUND", "TRADING_FUND"],
+            "issuerIds": [],
+            "sortOrder": "DESC",
+            "sortField": "navTo6Months",
+            "page": 1,
+            "pageSize": limit,
+            "isIpo": False,
+            "fundAssetTypes": [],
+            "bondRemainPeriods": [],
+            "searchField": query,
+            "isBuyByReward": False,
+            "thirdAppIds": [],
+        }
+
+        try:
+            response = self.client.post(url, json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+            if "data" in data and "rows" in data["data"]:
+                funds = []
+                for row in data["data"]["rows"]:
+                    funds.append(self._parse_fund_row(row))
+                return funds
+            return []
+        except Exception as e:
+            logger.error(f"Error searching funds with query '{query}': {e}")
+            return []
+
+    def get_funds_by_codes(self, codes: list[str]) -> list[dict[str, Any]]:
+        """
+        Fetch specific funds by their codes.
+        Since there's no direct bulk get by code, we search for each.
+        """
+        results = []
+        for code in codes:
+            # increasing limit slightly in case of partial matches, though exact code usually comes first
+            funds = self.search_funds(code, limit=5)
+            # Filter for exact match or close match if needed
+            # For now, take the first one that matches the code in shortName if possible
+            found = None
+            for f in funds:
+                if code.upper() in f["name"].upper():
+                    found = f
+                    break
+
+            if found:
+                # enrich with detailed holdings
+                detail = self.get_fund_detail(found["id"])
+                if detail:
+                    found["top_holdings"] = detail.get("top_holdings", [])
+                    found.update(detail)  # Merge details
+                results.append(found)
+        return results
+
+    def _parse_fund_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        """Helper to parse a fund row from search/filter response."""
+        fund_type = None
+        if row.get("fundAssetType"):
+            fund_type = row["fundAssetType"].get("name")
+        elif row.get("dataFundAssetType"):
+            fund_type = row["dataFundAssetType"].get("name")
+
+        return {
+            "id": row.get("id"),
+            "name": row.get("shortName"),
+            "full_name": row.get("name"),
+            "nav": row.get("nav"),
+            "nav_12m": row.get("productNavChange", {}).get("navTo12Months"),
+            "nav_ytd": row.get("productNavChange", {}).get("navToLastYear"),
+            "nav_6m": row.get("productNavChange", {}).get("navTo6Months"),
+            "nav_3y": row.get("productNavChange", {}).get("navTo36Months"),
+            "type": fund_type,
+        }
+
     def get_top_funds(
         self, limit: int = 10, include_holdings: bool = False
     ) -> list[dict[str, Any]]:
@@ -128,23 +209,7 @@ class FmarketClient:
             if "data" in data and "rows" in data["data"]:
                 funds = []
                 for row in data["data"]["rows"]:
-                    # Get fund type from available fields
-                    fund_type = None
-                    if row.get("fundAssetType"):
-                        fund_type = row["fundAssetType"].get("name")
-                    elif row.get("dataFundAssetType"):
-                        fund_type = row["dataFundAssetType"].get("name")
-
-                    fund_data = {
-                        "id": row.get("id"),
-                        "name": row.get("shortName"),
-                        "nav": row.get("nav"),
-                        "nav_12m": row.get("productNavChange", {}).get("navTo12Months"),
-                        "nav_ytd": row.get("productNavChange", {}).get("navToLastYear"),
-                        "nav_6m": row.get("productNavChange", {}).get("navTo6Months"),
-                        "nav_3y": row.get("productNavChange", {}).get("navTo36Months"),
-                        "type": fund_type,
-                    }
+                    fund_data = self._parse_fund_row(row)
 
                     # Optionally fetch detailed holdings
                     if include_holdings and row.get("id"):

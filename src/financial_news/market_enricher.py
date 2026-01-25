@@ -128,19 +128,19 @@ class MarketEnricher:
         results = self._search(query, max_results=3)
         return self._format_results(results)
 
-    def search_fund_context(self, top_funds: list[dict[str, Any]]) -> str:
+    def search_fund_context(self, market_stats: dict[str, Any]) -> str:
         """
         Search for fund performance and market sector news.
 
         Returns:
             Formatted search results string.
         """
-        if not self.tavily.api_key or not top_funds:
-            return ""
+        top_funds = market_stats.get("top_funds", [])
+        # Extract top holdings for search from both top_funds and watchlist_funds
+        all_funds = (market_stats.get("watchlist_funds") or []) + top_funds
 
-        # Extract top holdings for search
         all_holdings = []
-        for fund in top_funds[:3]:
+        for fund in all_funds[:5]:  # Check first 5 funds
             holdings = fund.get("top_holdings", [])
             for h in holdings[:2]:
                 if h.get("stock_code"):
@@ -192,7 +192,9 @@ class MarketEnricher:
 
         # Search fund context
         top_funds = market_stats.get("top_funds", [])
-        if top_funds:
-            enrichments["funds_context"] = self.search_fund_context(top_funds)
+        watchlist_funds = market_stats.get("watchlist_funds", [])
+
+        if top_funds or watchlist_funds:
+            enrichments["funds_context"] = self.search_fund_context(market_stats)
 
         return enrichments
