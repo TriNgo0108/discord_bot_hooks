@@ -72,19 +72,28 @@ def main():
         f"VN30 Index: {vn30_current.get('current', 'N/A')} ({vn30_current.get('change_percent', 0):+.2f}%)"
     )
 
-    # Combine News
+    # Fetch Political/Policy News
+    logger.info("Fetching political/policy news about stocks and funds...")
+    enricher = NewsEnricher()
+    political_news = enricher.search_political_news(
+        max_topics=5,  # Search top 5 topics
+        max_results_per_topic=3,
+    )
+    logger.info(f"Fetched {len(political_news)} political news items.")
+
+    # Combine News (including political news)
     combined_news = fmarket_news + vn_news[:5] + global_news[:5]
 
-    if not combined_news:
+    if not combined_news and not political_news:
         logger.info("No news found.")
         return
 
     # Enrich News (Top 3 items)
     logger.info("Enriching top news with Web Context...")
-    enricher = NewsEnricher()
     combined_news = enricher.enrich_news_items(combined_news, limit=3)
 
     # Build initial market stats
+    political_context = enricher.format_political_news_for_summary(political_news, limit=10)
     market_stats = {
         "top_funds": top_funds,
         "watchlist_funds": watchlist_funds,
@@ -94,6 +103,8 @@ def main():
         "vn30_current": vn30_current,
         "vn30_symbols": vn30_symbols,
         "top_movers": vn30_top_movers,
+        "political_news": political_news,
+        "political_context": political_context,
     }
 
     # Enrich Market Data with Perplexity

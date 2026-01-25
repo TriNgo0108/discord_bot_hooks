@@ -266,6 +266,12 @@ class NewsSummarizer:
             if context_parts:
                 parts.append("\n---\n**Web Research Context:**\n" + "\n\n".join(context_parts))
 
+        # Political/Policy News Context
+        if "political_context" in market_stats and market_stats["political_context"]:
+            parts.append(
+                "\n---\n**Political & Policy News:**\n" + market_stats["political_context"]
+            )
+
         return "\n\n".join(parts) if parts else "Market data unavailable"
 
     def _generate_fallback_summary(
