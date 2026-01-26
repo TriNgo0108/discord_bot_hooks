@@ -450,6 +450,26 @@ requires-dist = [
 name = "discord-bot-hooks-monorepo"
 version = "0.1.0"
 source = { virtual = "." }
+dependencies = [
+    { name = "bot-common" },
+    { name = "derivatives-analyzer" },
+    { name = "expense-report" },
+    { name = "financial-news" },
+    { name = "gmail-reader" },
+    { name = "polymarket-analyzer" },
+    { name = "todo-notifier" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bot-common", editable = "src/common" },
+    { name = "derivatives-analyzer", editable = "src/derivatives" },
+    { name = "expense-report", editable = "src/expense_report" },
+    { name = "financial-news", editable = "src/financial_news" },
+    { name = "gmail-reader", editable = "src/gmail_reader" },
+    { name = "polymarket-analyzer", editable = "src/poly_market" },
+    { name = "todo-notifier", editable = "src/todo_notifier" },
+]
 
 [[package]]
 name = "et-xmlfile"
@@ -466,13 +486,17 @@ version = "0.1.0"
 source = { editable = "src/expense_report" }
 dependencies = [
     { name = "bot-common" },
+    { name = "httpx" },
     { name = "psycopg2-binary" },
+    { name = "python-dotenv" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "bot-common", editable = "src/common" },
+    { name = "httpx" },
     { name = "psycopg2-binary" },
+    { name = "python-dotenv" },
 ]
 
 [[package]]

@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 
-from src.derivatives.data_aggregator import DataAggregator
+from derivatives_analyzer.data_aggregator import DataAggregator
 
 from .feed_manager import FeedManager
 from .fmarket_client import FmarketClient

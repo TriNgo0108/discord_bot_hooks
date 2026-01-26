@@ -3,10 +3,27 @@ name = "discord-bot-hooks-monorepo"
 version = "0.1.0"
 description = "Monorepo for Discord Bot Hooks"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+  "bot-common",
+  "derivatives-analyzer",
+  "expense-report",
+  "financial-news",
+  "gmail-reader",
+  "polymarket-analyzer",
+  "todo-notifier"
+]
 
 [tool.uv.workspace]
 members = ["src/*"]
+
+[tool.uv.sources]
+bot-common = { workspace = true }
+derivatives-analyzer = { workspace = true }
+expense-report = { workspace = true }
+financial-news = { workspace = true }
+gmail-reader = { workspace = true }
+polymarket-analyzer = { workspace = true }
+todo-notifier = { workspace = true }
 
 [tool.ruff]
 line-length = 100
