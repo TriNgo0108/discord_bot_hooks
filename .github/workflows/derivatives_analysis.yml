@@ -25,4 +25,4 @@ jobs:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           DISCORD_WEBHOOK_DERIVATIVES: ${{ secrets.DISCORD_WEBHOOK_DERIVATIVES }}
         run: |
-          uv run python -m src.derivatives.main --instruments "VN30F1M,VN30F2M"
+          uv run python -m derivatives_analyzer --instruments "VN30F1M,VN30F2M"

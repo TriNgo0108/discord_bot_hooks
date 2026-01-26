@@ -50,7 +50,7 @@ jobs:
           DISCORD_WEBHOOK_POLYMARKET: ${{ secrets.DISCORD_WEBHOOK_POLYMARKET }}
           SEARCH_PROVIDER: "ddg"
         run: |
-          uv run python -m src.poly_market.main \
+          uv run python -m polymarket_analyzer \
             --events ${{ github.event.inputs.max_events || '10' }} \
             --markets ${{ github.event.inputs.max_markets || '3' }} \
             --confidence ${{ github.event.inputs.min_confidence || '5' }} \

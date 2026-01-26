@@ -28,4 +28,4 @@ jobs:
           ENV: production
           DB_URL: ${{ secrets.DB_URL }}
           DISCORD_WEBHOOK_TODO: ${{ secrets.DISCORD_WEBHOOK_TODO }}
-        run: uv run python -m src.todo_notifier.main
+        run: uv run python -m todo_notifier
