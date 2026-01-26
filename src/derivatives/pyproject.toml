@@ -1,0 +1,18 @@
+[project]
+name = "derivatives-analyzer"
+version = "0.1.0"
+description = "Vietnam Derivatives Market Analyzer"
+requires-python = ">=3.11"
+dependencies = [
+    "vnstock>=0.2.0",
+    "pytz",
+    "pandas",
+    "bot-common",
+]
+
+[tool.uv.sources]
+bot-common = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

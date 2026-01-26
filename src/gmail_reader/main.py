@@ -1,594 +1,67 @@
-import datetime
-import email
-import html
-import imaplib
-import os
-import re
-import time
-from email.header import decode_header
+"""Main entry point for Gmail Reader."""
 
-import httpx
+import asyncio
+import logging
 
-DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_GMAIL")
-GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
-GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+from .config import CONFIG
+from .discord_client import DiscordClient
+from .imap_client import GmailClient
+from .summarizer import AISummarizer
 
-# Z.AI (GLM-4.7) configuration
-ZAI_API_KEY = os.getenv("ZAI_API_KEY")
-ZAI_BASE_URL = os.getenv("ZAI_BASE_URL", "https://api.z.ai/api/coding/paas/v4")
-ZAI_MODEL = os.getenv("ZAI_MODEL", "glm-4.7")
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# OPTIMIZED PROMPT (Using prompt-engineering-patterns skill)
-# =============================================================================
+async def fetch_emails_sync() -> list:
+    """Wrapper to run blocking IMAP operations in a thread."""
 
-GMAIL_SUMMARY_PROMPT = """You are an executive assistant extracting decision-critical info from emails.
+    def _fetch():
+        with GmailClient(CONFIG.gmail) as client:
+            return client.fetch_recent_emails(days=1)
 
-## Rules
-1. NO FLUFF - Never write "The email says" or "In conclusion"
-2. START immediately with TL;DR
-3. PRESERVE important links as [text](url)
-4. Use SPECIFIC numbers, dates, names - no vague language
-5. If no action required, state "FYI only"
-
-## Examples
-
-### Example 1: Newsletter
-EMAIL: "OpenAI announced GPT-5 today with 2x context window. Enterprise pricing starts at $60/user. API pricing unchanged at $0.002/1K tokens."
-OUTPUT:
-**TL;DR**: GPT-5 launched with 2x context, API $0.002/1K (unchanged), Enterprise $60/user.
-**Actions**: None (FYI only)
-
-### Example 2: Meeting Request
-EMAIL: "Hi, can we sync for 30min on the Q4 budget? I'm proposing Dec 15 at 2pm. Please confirm by Dec 13."
-OUTPUT:
-**TL;DR**: John requests 30min Q4 budget sync on Dec 15, 2pm.
-**Actions**:
-- Accept/decline by Dec 13
-**Deadlines**:
-- Dec 13: RSVP deadline
-- Dec 15, 2pm: Meeting
-
-### Example 3: Payment/Invoice
-EMAIL: "Your AWS bill for December is $1,234.56. Auto-pay is enabled. Payment will be processed on Jan 5."
-OUTPUT:
-**TL;DR**: AWS bill $1,234.56 due Jan 5 (auto-pay active).
-**Actions**: None (auto-pay enabled)
-**Deadlines**:
-- Jan 5: Payment processed
-
----
-
-## Email Content
-{email_content}
-"""
+    return await asyncio.to_thread(_fetch)
 
 
-def summarize_content(text):
-    """Summarize text using Z.AI GLM-4.7 with optimized prompt and retry logic."""
-    if not ZAI_API_KEY:
-        print("ZAI_API_KEY not set. Skipping summarization.")
-        return None
+async def main():
+    """Fetch, summarize, and notify about recent emails."""
+    logger.info("Starting Gmail Reader (Async)...")
 
-    prompt = GMAIL_SUMMARY_PROMPT.format(email_content=text)
-
-    max_retries = 5
-    base_delay = 10
-
-    for attempt in range(max_retries):
-        try:
-            response = httpx.post(
-                f"{ZAI_BASE_URL}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {ZAI_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": ZAI_MODEL,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "You are an executive assistant extracting decision-critical info from emails. Be concise and actionable.",
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": 0.3,
-                },
-                timeout=120,
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data["choices"][0]["message"]["content"].strip()
-
-        except Exception as e:
-            if attempt == max_retries - 1:
-                print(f"Summarization failed after {max_retries} attempts: {e}")
-                return None
-
-            print(
-                f"Summarization attempt {attempt + 1} failed: {e}. Retrying in {base_delay * (attempt + 1)}s..."
-            )
-            time.sleep(base_delay * (attempt + 1))
-
-    return None
-
-
-def decode_mime_header(header_value):
-    """Decode MIME encoded header to string."""
-    if not header_value:
-        return "(No Value)"
-
-    decoded_parts = decode_header(header_value)
-    result = ""
-    for part, encoding in decoded_parts:
-        if isinstance(part, bytes):
-            result += part.decode(encoding or "utf-8", errors="ignore")
-        else:
-            result += part
-    return result
-
-
-def parse_html_links(html_content):
-    """Parse HTML content and extract clickable links as (label, url) tuples."""
-    links = []
-    # Match <a href="url">text</a> patterns
-    link_pattern = r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>([^<]*)</a>'
-    matches = re.findall(link_pattern, html_content, re.IGNORECASE)
-
-    # Noise terms for links (text-based)
-    skip_terms = [
-        "unsubscribe",
-        "preference",
-        "view in browser",
-        "privacy policy",
-        "terms of service",
-        "manage subscription",
-    ]
-
-    # Tracking URL patterns to filter out
-    tracking_patterns = [
-        # Email service providers / Marketing platforms
-        "click.mailchimp.com",
-        "links.email.",
-        "track.customer.io",
-        "tracking.",
-        "t.dripemail2.com",
-        "email.mg.",
-        "link.mail.",
-        "trk.klclick.com",
-        "clicks.beehiiv.com",
-        "open.substack.com",
-        "email.substack.com",
-        "mailtrack.",
-        "t.sidekickopen",
-        "mandrillapp.com/track",
-        "list-manage.com/track",
-        # Analytics / Tracking services
-        "utm_source",
-        "utm_medium",
-        "utm_campaign",
-        "/track/click",
-        "/track/open",
-        "trk=",
-        "mc_cid=",
-        "mc_eid=",
-        # Generic tracking patterns
-        "redirect.",
-        "/r/",  # Common redirect pattern
-        "click.",
-        "go.link",
-        "links.e.",
-        "elink.",
-        "t.co/",  # Twitter shortener often used for tracking
-        "bit.ly/",
-        # Social / Confirmation / Utility
-        "confirm",
-        "verify",
-    ]
-
-    for url, text in matches:
-        text = text.strip()
-        if url and not url.startswith("mailto:"):
-            # Filter out tracking URLs
-            url_lower = url.lower()
-            if any(pattern in url_lower for pattern in tracking_patterns):
-                continue
-
-            # Clean up the text
-            text = re.sub(r"\s+", " ", text)
-
-            # If text is empty or is a URL itself, extract domain as label
-            if not text or text.startswith("http://") or text.startswith("https://"):
-                # Extract domain from URL for a cleaner label
-                domain_match = re.search(r"https?://(?:www\.)?([^/]+)", url)
-                text = domain_match.group(1) if domain_match else "Link"
-
-            # Filter out noise links (by text)
-            if any(term in text.lower() for term in skip_terms):
-                continue
-
-            if len(text) > 50:
-                text = text[:47] + "..."
-            links.append((text, url))
-    return links[:5]  # Limit to 5 links per email
-
-
-def parse_html_images(html_content):
-    """Parse HTML content and extract valid image URLs, filtering out tracking pixels."""
-    images = []
-    # Match <img src="url"> patterns
-    img_pattern = r'<img[^>]*src=["\']([^"\']+)["\'][^>]*>'
-    matches = re.findall(img_pattern, html_content, re.IGNORECASE)
-    for url in matches:
-        # Skip tracking pixels and tiny images, keep actual content images
-        if (
-            url
-            and not any(
-                skip in url.lower() for skip in ["tracking", "pixel", "1x1", "spacer", "blank"]
-            )
-            and url.startswith(("http://", "https://"))
-        ):
-            images.append(url)
-    return images[:1]  # Return only first image to avoid spam
-
-
-def convert_html_to_markdown(html_content):
-    """Convert HTML content to Discord Markdown."""
-    if not html_content:
-        return ""
-
-    # Basic cleanup
-    text = re.sub(r"<style[^>]*>.*?</style>", "", html_content, flags=re.DOTALL | re.IGNORECASE)
-    text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.DOTALL | re.IGNORECASE)
-
-    # Convert simple tags
-    text = re.sub(r"<b>(.*?)</b>", r"**\1**", text, flags=re.IGNORECASE)
-    text = re.sub(r"<strong>(.*?)</strong>", r"**\1**", text, flags=re.IGNORECASE)
-    text = re.sub(r"<i>(.*?)</i>", r"*\1*", text, flags=re.IGNORECASE)
-    text = re.sub(r"<em>(.*?)</em>", r"*\1*", text, flags=re.IGNORECASE)
-
-    # Convert links
-    # Convert links
-    def replace_link(match):
-        url = match.group(1)
-        content = match.group(2).strip()
-
-        # Remove tags from the link content to see if it has visible text
-        # (e.g., skip links that only contain images or are empty)
-        visible_text = re.sub(r"<[^>]+>", "", content).strip()
-
-        if not visible_text:
-            return ""
-
-        return f"[{visible_text}]({url})"
-
-    text = re.sub(
-        r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', replace_link, text, flags=re.IGNORECASE
-    )
-
-    # Convert lists
-    text = re.sub(r"<li>", "\n• ", text, flags=re.IGNORECASE)
-    text = re.sub(r"</li>", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"<ul>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"</ul>", "\n", text, flags=re.IGNORECASE)
-
-    # Convert <br>, <p>, <div>, <tr>, headers
-    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"</p>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<p[^>]*>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"</div>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"</tr>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"</h[1-6]>", "\n\n", text, flags=re.IGNORECASE)
-
-    # Remove remaining tags
-    text = re.sub(r"<[^>]+>", "", text)
-
-    return clean_text_content(text)
-
-
-def clean_text_content(text):
-    """Clean up text by decoding entities and removing invisible characters."""
-    if not text:
-        return ""
-
-    # Decode HTML entities (Robustly) - Loop to handle double encoding
-    for _ in range(3):
-        new_text = html.unescape(text)
-        if new_text == text:
-            break
-        text = new_text
-
-    # Remove specific noise characters (Soft hyphens, invisible separators, etc.)
-    # \u00ad (Soft Hyphen), \u200b (Zero Width Space), \u200c (ZWUJ), \u200d (ZWJ), \u2007 (Figure Space), \u034f (CGJ)
-    text = re.sub(r"[\u00ad\u200b\u200c\u200d\u2007\u034f]", "", text)
-
-    # Clean up excessive whitespace created by stripping/decoding
-    # Replace non-breaking spaces with normal spaces first
-    text = text.replace("\xa0", " ")
-
-    # Collapse multiple spaces
-    text = re.sub(r"[ \t]+", " ", text)
-
-    # Fix multiple newlines (limit to 2 max)
-    text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
-
-    return text.strip()
-
-
-def fetch_recent_emails():
-    """Fetch emails from the last 24 hours using IMAP."""
-    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
-        print("GMAIL_ADDRESS or GMAIL_APP_PASSWORD not set.")
-        return []
+    # Initialize components with Dependency Injection
+    summarizer = AISummarizer(CONFIG.ai)
+    discord = DiscordClient(CONFIG.discord)
 
     try:
-        mail = imaplib.IMAP4_SSL("imap.gmail.com")
-        mail.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-        mail.select("INBOX")
+        # 1. Fetch Emails (Blocking I/O isolated in thread)
+        logger.info("Fetching emails...")
+        emails = await fetch_emails_sync()
 
-        yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%d-%b-%Y")
-        status, message_ids = mail.search(None, f"SINCE {yesterday}")
+        if not emails:
+            logger.info("No new emails found.")
+            await discord.send_summary([])
+            return
 
-        if status != "OK":
-            print("Failed to search emails.")
-            return []
+        logger.info(f"Processing {len(emails)} emails...")
 
-        if not message_ids[0]:
-            print("Found 0 messages.")
-            return []
-
-        email_ids = message_ids[0].split()
-        print(f"Found {len(email_ids)} messages.")
-
-        emails = []
-
-        # Process all emails
-        for email_id in email_ids:
-            status, msg_data = mail.fetch(email_id, "(RFC822)")
-
-            if status != "OK":
-                continue
-
-            raw_email = msg_data[0][1]
-            msg = email.message_from_bytes(raw_email)
-
-            subject = decode_mime_header(msg["Subject"])
-            sender = decode_mime_header(msg["From"])
-
-            # Get content from body
-            snippet = ""
-            html_content = ""
-            links = []
-            images = []
-
-            def get_decoded_payload(message_part):
-                """Helper to decode payload with correct charset."""
-                payload = message_part.get_payload(decode=True)
-                if not payload:
-                    return ""
-                charset = message_part.get_content_charset() or "utf-8"
-                try:
-                    return payload.decode(charset, errors="replace")
-                except LookupError:
-                    # Fallback for unknown encodings
-                    return payload.decode("utf-8", errors="replace")
-
-            if msg.is_multipart():
-                for part in msg.walk():
-                    content_type = part.get_content_type()
-                    if content_type == "text/plain" and not snippet:
-                        snippet = get_decoded_payload(part)
-                    elif content_type == "text/html" and not html_content:
-                        html_content = get_decoded_payload(part)
-            else:
-                content_type = msg.get_content_type()
-                if content_type == "text/html":
-                    html_content = get_decoded_payload(msg)
-                else:
-                    snippet = get_decoded_payload(msg)
-
-            # Extract links and images from HTML
-            if html_content:
-                links = parse_html_links(html_content)
-                images = parse_html_images(html_content)
-                snippet = convert_html_to_markdown(html_content)
-            elif snippet:
-                snippet = clean_text_content(snippet)
-
-            if not snippet:
-                snippet = "(No content)"
-
-            emails.append(
-                {
-                    "subject": subject,
-                    "from": sender,
-                    "body_text": snippet,
-                    "links": links,
-                    "images": images,
-                }
-            )
-
-        mail.logout()
-        return emails
-
-    except Exception as e:
-        print(f"IMAP error: {e}")
-        return []
-
-
-def split_text_smartly(text, max_length=4000):
-    """Split text into chunks, trying to break at newlines to preserve Markdown formatting."""
-    chunks = []
-    current_pos = 0
-    text_len = len(text)
-
-    while current_pos < text_len:
-        # If remaining text fits, just add it
-        if text_len - current_pos <= max_length:
-            chunks.append(text[current_pos:])
-            break
-
-        # Get the candidate block
-        candidate = text[current_pos : current_pos + max_length]
-
-        # Look for the last newline to split safely
-        split_at = -1
-        last_newline = candidate.rfind("\n")
-
-        # If we found a newline and it's not too close to the beginning (avoid tiny chunks)
-        if last_newline > max_length * 0.2:
-            split_at = last_newline + 1  # Include the newline in the current chunk
-
-        # If no good newline, try space
-        if split_at == -1:
-            last_space = candidate.rfind(" ")
-            if last_space > max_length * 0.2:
-                split_at = last_space + 1
-
-        # If still no good split point, force hard split
-        if split_at == -1:
-            split_at = max_length
-
-        chunks.append(text[current_pos : current_pos + split_at])
-        current_pos += split_at
-
-    return chunks
-
-
-def send_discord_webhook(emails):
-    """Send email summary to Discord webhook using embeds."""
-    if not DISCORD_WEBHOOK_URL:
-        print("DISCORD_WEBHOOK_GMAIL not set.")
-        return
-
-    today_date = datetime.date.today().strftime("%Y-%m-%d")
-
-    if not emails:
-        message = (
-            f"**Daily Gmail Summary** 📧 ({today_date})\n\nNo new emails in the last 24 hours. ✅"
-        )
-        httpx.post(DISCORD_WEBHOOK_URL, json={"content": message})
-        return
-
-    # Send header
-    header_embed = {
-        "title": "📧 Daily Gmail Summary",
-        "description": f"{len(emails)} emails received",
-        "color": 0xEA4335,  # Gmail red
-        "footer": {"text": today_date},
-    }
-    httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": [header_embed]})
-
-    httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": [header_embed]})
-
-    for email_data in emails:
-        body_text = email_data.get("body_text", "") or "No content"
-        subject = email_data.get("subject", "No Subject")[:256]
-        sender = email_data.get("from", "Unknown")[:256]
-
-        # Cleanup: Remove redundant Subject/Sender from the start of the body
-        # Many newsletters repeat this info in the pre-header or top HTML
-        lines = body_text.split("\n")
-        skip_index = 0
-
-        # Prepare checks
-        checks = [subject.strip().lower(), sender.strip().lower()]
-        noise_phrases = [
-            "email from substack",
-            "view in browser",
-            "unsubscribe",
-            "manage your subscription",
-            "confirm subscription",  # Often repeated title
-            "please confirm your subscription",
-        ]
-
-        # Check the first 10 non-empty lines
-        checked_lines = 0
-        for i, line in enumerate(lines):
-            clean_line = line.strip().lower()
-            if not clean_line:
-                continue
-
-            # Stop if we've checked too many lines
-            if checked_lines >= 10:
-                break
-
-            is_noise = False
-            # Check for Sender/Subject overlapping
-            if any(c in clean_line or clean_line in c for c in checks if c) or any(
-                phrase in clean_line for phrase in noise_phrases
-            ):
-                is_noise = True
-
-            if is_noise:
-                skip_index = i + 1
-            else:
-                # If we hit a substantial line that isn't noise, we stop stripping
-                break
-            checked_lines += 1
-
-        if skip_index > 0:
-            body_text = "\n".join(lines[skip_index:]).strip()
-
-        # Chunk the body text smartly
-        chunks = split_text_smartly(body_text, max_length=4000)
-
-        if not chunks:
-            chunks = ["(No content)"]
-
-        for i, chunk in enumerate(chunks):
-            description = chunk
-
-            # If last chunk, append links
-            if i == len(chunks) - 1 and email_data["links"]:
-                description += "\n\n**🔗 Links:**\n"
-                for text, url in email_data["links"]:
-                    link_line = f"• [{text}]({url})\n"
-                    # Prevent overflowing 4096
-                    if len(description) + len(link_line) < 4090:
-                        description += link_line
-
-            # Embed Title logic
-            if i == 0:
-                title = subject
-                author_field = {"name": sender}
-            else:
-                title = f"{subject} (Part {i + 1})"
-                author_field = {}
-
-            embed = {
-                "title": title,
-                "description": description,
-                "color": 0x4285F4,  # Google blue
-            }
-
-            if author_field:
-                embed["author"] = author_field
-
-            # Add image to first chunk only
-            if i == 0 and email_data["images"]:
-                embed["image"] = {"url": email_data["images"][0]}
-
-            httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": [embed]})
-
-
-def main():
-    """Main entry point for Gmail reader."""
-    print("Fetching emails via IMAP...")
-    emails = fetch_recent_emails()
-
-    if emails:
-        print(f"Summarizing {len(emails)} emails...")
-        for i, email_data in enumerate(emails):
-            print(f"[{i + 1}/{len(emails)}] Summarizing: {email_data['subject'][:50]}...")
-            summary = summarize_content(email_data["body_text"])
+        # 2. Summarize Emails (Async I/O)
+        # We process them sequentially or in small batches to preserve order/logging clearity
+        # and avoid 429s on the AI API if it has strict limits.
+        for i, email_data in enumerate(emails, 1):
+            logger.info(f"[{i}/{len(emails)}] Summarizing: {email_data['subject'][:50]}...")
+            summary = await summarizer.summarize(email_data["body_text"])
             if summary:
                 email_data["body_text"] = summary
 
-    print(f"Sending {len(emails)} emails to Discord...")
-    send_discord_webhook(emails)
+        # 3. Notify Discord (Async I/O)
+        logger.info("Sending notifications to Discord...")
+        await discord.send_summary(emails)
+        logger.info("Done.")
+
+    except Exception as e:
+        logger.error(f"Application error: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

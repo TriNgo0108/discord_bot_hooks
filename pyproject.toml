@@ -1,63 +1,20 @@
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "discord_bot_hooks"
+name = "discord-bot-hooks-monorepo"
 version = "0.1.0"
-description = "Discord Bot Hooks"
+description = "Monorepo for Discord Bot Hooks"
 requires-python = ">=3.11"
-dependencies = [
-    "httpx",
-    "python-dotenv",
-    "tenacity>=8.0.0",
-]
+dependencies = []
 
-[project.optional-dependencies]
-financial_news = [
-    "feedparser",
-    "beautifulsoup4",
-]
-derivatives = [
-    "vnstock>=0.2.0",
-    "pytz",
-]
-expense_report = [
-    "psycopg2-binary",
-]
-todo_notifier = [
-    "psycopg2-binary",
-]
-polymarket_analysis = [
-    "ddgs"
-]
-dev = [
-    "requests",
-    "playwright",
-    "aiohttp>=3.9.0",
-]
-
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.uv.workspace]
+members = ["src/*"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-select = [
-    "E",     # pycodestyle errors
-    "W",     # pycodestyle warnings
-    "F",     # Pyflakes
-    "I",     # isort
-    "B",     # flake8-bugbear
-    "C4",    # flake8-comprehensions
-    "UP",    # pyupgrade
-    "SIM",   # flake8-simplify
-]
-ignore = [
-    "E501",  # line too long (handled by formatter)
-]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"

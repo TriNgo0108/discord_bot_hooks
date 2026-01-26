@@ -1,0 +1,20 @@
+[project]
+name = "gmail-reader"
+version = "0.1.0"
+description = "Gmail to Discord summarizer"
+requires-python = ">=3.11"
+dependencies = [
+    "bot-common",
+    "google-auth",         # If needed later, currently using imaplib
+    "beautifulsoup4",      # For robust HTML parsing if we switch from regex
+]
+
+[tool.uv.sources]
+bot-common = { workspace = true }
+
+[project.scripts]
+gmail-reader = "src.gmail_reader.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
