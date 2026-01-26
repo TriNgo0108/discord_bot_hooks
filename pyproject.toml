@@ -28,6 +28,9 @@ expense_report = [
 todo_notifier = [
     "psycopg2-binary",
 ]
+polymarket_analysis = [
+    "ddgs"
+]
 dev = [
     "requests",
     "playwright",

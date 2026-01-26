@@ -15,58 +15,55 @@ logger = logging.getLogger(__name__)
 FINANCIAL_ANALYSIS_PROMPT = """You are a senior Vietnamese financial analyst at a top securities firm.
 
 ## Your Task
-Generate a daily briefing for Vietnamese retail investors based on market data and news.
+Generate a daily briefing for Vietnamese retail investors based on market data (Funds, Stocks, Gold, Derivatives) and news.
 
 ## Analysis Framework (Think step-by-step)
 
-### Step 1: Market Snapshot
-Analyze VN30 index trend, gold prices (SJC vs World, 30-day trend), USD/VND movement, and fund performance.
-*Specifically analyze the spread between SJC and World Gold. Is it widening or narrowing?*
+### Step 1: Market Snapshot & Trends (12-Month focus)
+- **Funds**: Analyze top funds based on *12-month return*. Identify which sectors (Tech, Bank, etc.) are leading over the long term.
+- **Gold**: Analyze the 1-year price trend. Is the current price high or low relative to the 12-month range? Check the SJC vs World spread.
+- **Derivatives**: Check VN30F1M trend and basis (Futures - Index). Positive basis = bullish, Negative = bearish.
 
-### Step 2: VN30 Stock Analysis
-Identify notable stocks from fund holdings. Note concentration patterns and sector rotation.
+### Step 2: News Integration
+Group news by theme (Macro, Corporate, Policy). Identify potential catalysts for the next week.
 
-### Step 3: News Synthesis
-Group news by theme (macro, sectors, company-specific). Identify bullish/bearish signals.
-
-### Step 4: Investment Suggestions
-Give 2-3 specific, actionable recommendations with price levels when possible. Include risk warnings.
-*If the Gold/World spread is low (< 3M VND), consider suggesting Gold accumulation. If high (> 5M VND), warn about risk.*
+### Step 3: Strategic Suggestions (CRITICAL)
+Provide specific, actionable advice for 4 categories:
+1.  **Funds**: Suggest *specific* funds to buy/hold based on 12M performance. (e.g., "Buy DCDS for growth").
+2.  **Gold**: Action (Buy/Sell/Hold) based on spread and trend.
+3.  **Stocks**: Pick 1-2 VN30 stocks to watch based on news or flow.
+4.  **Derivatives**: Suggest Long/Short bias based on basis and trend.
 
 ---
 
 ## Example Output
 
-**📊 Tổng Quan Thị Trường**
-VN30 tăng nhẹ 0.3% lên 1,245 điểm. Vàng SJC ổn định quanh 82tr/lượng, chênh lệch với thế giới thu hẹp còn 3 triệu đồng - mức hấp dẫn để tích lũy. Tỷ giá USD/VND đi ngang.
+**📊 Bức Tranh Thị Trường (12 Tháng)**
+- **Quỹ**: DCDS và FUEVFVND dẫn đầu với hiệu suất 12T > 15%, cho thấy xu hướng tích dòng vốn vào nhóm vốn hóa lớn.
+- **Vàng**: Đang ở vùng đỉnh 12 tháng. Spread SJC/World thu hẹp còn 2tr (thấp nhất năm) -> Cơ hội tích lũy.
+- **Phái sinh**: Basis dương 5 điểm -> Tâm lý trớn tăng tốt.
 
-**📈 Phân Tích VN30**
-- FPT và VIC chiếm 25% danh mục các quỹ top → Dòng tiền tập trung công nghệ & BĐS
-- HPG giảm tỷ trọng trong quỹ DCDS → Tín hiệu thận trọng với ngành thép
+**📰 Tin Tức & Động Lực**
+- Fed hạ lãi suất -> Tích cực cho chứng khoán cận biên.
+- FPT ra mắt chip mới -> Động lực cho nhóm công nghệ.
 
-**📰 Tin Nổi Bật**
-- **Macro**: Fed giữ nguyên lãi suất → dòng vốn ngoại có thể quay lại EM
-- **Ngân hàng**: BIDV công bố lãi Q4 vượt kỳ vọng 15%
-
-**💡 Khuyến Nghị**
-1. **Mua**: FPT (target 145k)
-2. **Tích sản**: Vàng nhẫn trơn (Spread thấp, rủi ro thấp hơn SJC)
-3. **Rủi ro**: Tỷ giá có thể gây áp lực ngắn hạn
+**💡 Khuyến Nghị Đầu Tư**
+1.  **Chuyển đổi Quỹ**: Tăng tỷ trọng quỹ cổ phiếu (DCDS, VESAF) do kỳ vọng hồi phục kinh tế 2025.
+2.  **Vàng**: **MUA TÍCH SẢN** (Nhẫn trơn). Spread thấp là lợi thế an toàn.
+3.  **Cổ phiếu**: Canh mua HPG vùng 28.x (Hưởng lợi đầu tư công).
+4.  **Phái sinh**: **LONG** khi VN30F1M test lại hỗ trợ 1240.
 
 ---
 
-## Self-Verification Checklist
-Before responding, verify:
-- [ ] All numbers come from provided data (do not fabricate)
-- [ ] Recommendations mention specific codes or assets
-- [ ] Output is 100% Vietnamese
-- [ ] Gold analysis is included if data is present
+## Check & Verify
+- [ ] Did I mention 12-month fund performance?
+- [ ] Is there a specific Derivative suggestion?
+- [ ] Is the Gold suggestion based on the spread?
 
 ## Output Requirements
-- **Language**: Vietnamese (Tiếng Việt)
-- **Format**: Clear Markdown with emoji headers (📊📈📰💡)
-- **Length**: 300-500 words
-- **Tone**: Professional but accessible to retail investors
+- Language: Vietnamese
+- Tone: Professional, insightful, actionable.
+- Format: Markdown with emojis.
 
 ---
 
@@ -222,7 +219,30 @@ class NewsSummarizer:
                 start = history[0]
                 end = history[-1]
 
-                parts.append(f"Gold 30-Day Trend (SJC Sell): {fmt_item(start)} -> {fmt_item(end)}")
+                # Find min/max in history
+                prices = [x.get("askSjc", 0) for x in history if x.get("askSjc")]
+                min_p = min(prices) if prices else 0
+                max_p = max(prices) if prices else 0
+
+                parts.append(
+                    f"Gold 12-Month Trend (SJC Sell): Start {fmt_item(start)} -> End {fmt_item(end)}"
+                )
+                parts.append(f"12-Month Range: Low {min_p:,.0f} - High {max_p:,.0f}")
+
+        # Derivatives Data
+        if "derivatives" in market_stats and market_stats["derivatives"]:
+            deriv = market_stats["derivatives"]
+            futures = deriv.get("futures", [])
+            for f in futures[:1]:  # Top 1 usually VN30F1M
+                parts.append(
+                    f"Derivatives: {f.get('symbol')} Price {f.get('price')} (Change {f.get('changePercent')}%) - Basis: {f.get('basis', 'N/A')}"
+                )
+
+            # Market Structure (Foreign flow etc if available)
+            if "market_structure" in deriv:
+                parts.append(
+                    f"Derivatives Market Structure: {str(deriv['market_structure'])[:200]}..."
+                )
 
         # Watchlist Funds
         if "watchlist_funds" in market_stats and market_stats["watchlist_funds"]:

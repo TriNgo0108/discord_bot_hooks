@@ -176,7 +176,10 @@ class FmarketClient:
         }
 
     def get_top_funds(
-        self, limit: int = 20, include_holdings: bool = False
+        self,
+        limit: int = 20,
+        include_holdings: bool = False,
+        sort_field: str = "navTo12Months",
     ) -> list[dict[str, Any]]:
         """
         Fetch top performing funds from Fmarket.
@@ -184,13 +187,14 @@ class FmarketClient:
         Args:
             limit: Maximum number of funds to return.
             include_holdings: If True, fetch detailed holdings for each fund.
+            sort_field: Field to sort by (e.g., 'navTo12Months', 'navTo6Months').
         """
         url = f"{self.BASE_URL}/products/filter"
         payload = {
             "types": ["NEW_FUND", "TRADING_FUND"],
             "issuerIds": [],
             "sortOrder": "DESC",
-            "sortField": "navTo6Months",
+            "sortField": sort_field,
             "page": 1,
             "pageSize": limit,
             "isIpo": False,
@@ -228,13 +232,13 @@ class FmarketClient:
 
     def get_gold_prices(self) -> dict[str, Any]:
         """
-        Fetch gold prices from Fmarket API (Last 30 days).
+        Fetch gold prices from Fmarket API (Last 12 months/365 days).
         """
         url = f"{self.BASE_URL}/get-price-gold-history"
 
         now = datetime.datetime.now()
         to_date_str = now.strftime("%Y%m%d")
-        from_date = now - datetime.timedelta(days=30)
+        from_date = now - datetime.timedelta(days=365)
         from_date_str = from_date.strftime("%Y%m%d")
 
         payload = {"fromDate": from_date_str, "toDate": to_date_str, "isAllData": False}
@@ -243,16 +247,6 @@ class FmarketClient:
             response = self.client.post(url, json=payload)
             response.raise_for_status()
             data = response.json()
-
-            # data['data'] contains list of history if range > 1 day?
-            # Based on API name 'get-price-gold-history', it likely returns a list in 'data' or 'rows'
-            # Let's check the structure assuming it returns a list of daily records.
-            # If it's a single object in 'extra' for today, we might need to look at 'data' for history.
-
-            # Common Fmarket pattern: data['data'] is the main payload.
-            # For history endpoint:
-            # If we request a range, 'data' should be a list of daily prices.
-            # 'extra' might still have the very latest real-time snapshot or summary.
 
             result = {
                 "sjc_buy": 0,
@@ -328,17 +322,9 @@ class FmarketClient:
         """
         Fetch market news/blog from Fmarket.
         """
-        # Try POST to get news if GET failed
-        url = f"{self.BASE_URL}/blog/filter"  # Guessing 'filter' based on product filter pattern
-        # Or maybe it's just 'newest'
-        # Let's try the one known to work for funds pattern: /res/blog/filter or /res/blog/get-newest
-        # Actually, let's revert to a safer bet or basic scraping if API fails.
-        # But wait, looking at the debug output, `blog/all` returned mktImageUrl.
-        # Let's try `blog/filter` with POST.
-
         url = f"{self.BASE_URL}/blog/filter"
         payload = {
-            "types": ["MARKET_NEWS", "KNOWLEDGE", "PERSONAL_FINANCE"],  # Guessed types
+            "types": ["MARKET_NEWS", "KNOWLEDGE", "PERSONAL_FINANCE"],
             "page": 1,
             "pageSize": 5,
         }
@@ -349,10 +335,6 @@ class FmarketClient:
             data = response.json()
 
             news = []
-            # Adapt to whatever structure comes back.
-            # If I can't reliably guess the API, I will return empty for now to avoid breaking flow.
-            # I will assume `data['data']['rows']` or `data['data']['content']`
-
             rows = []
             if "data" in data:
                 if "rows" in data["data"]:

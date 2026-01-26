@@ -71,10 +71,6 @@ def summarize_content(text):
         print("ZAI_API_KEY not set. Skipping summarization.")
         return None
 
-    # Truncate very long emails to avoid token limits
-    if len(text) > 8000:
-        text = text[:8000] + "\n\n[Content truncated...]"
-
     prompt = GMAIL_SUMMARY_PROMPT.format(email_content=text)
 
     max_retries = 5
@@ -99,7 +95,7 @@ def summarize_content(text):
                     ],
                     "temperature": 0.3,
                 },
-                timeout=60,
+                timeout=120,
             )
             response.raise_for_status()
             data = response.json()
@@ -405,13 +401,6 @@ def fetch_recent_emails():
             if not snippet:
                 snippet = "(No content)"
 
-            print(f"DEBUG: Processing email '{subject[:30]}...' - Body len: {len(snippet)}")
-
-            # Summarize content
-            summary = summarize_content(snippet)
-            if summary:
-                snippet = summary
-
             emails.append(
                 {
                     "subject": subject,
@@ -591,6 +580,15 @@ def main():
     """Main entry point for Gmail reader."""
     print("Fetching emails via IMAP...")
     emails = fetch_recent_emails()
+
+    if emails:
+        print(f"Summarizing {len(emails)} emails...")
+        for i, email_data in enumerate(emails):
+            print(f"[{i + 1}/{len(emails)}] Summarizing: {email_data['subject'][:50]}...")
+            summary = summarize_content(email_data["body_text"])
+            if summary:
+                email_data["body_text"] = summary
+
     print(f"Sending {len(emails)} emails to Discord...")
     send_discord_webhook(emails)
 

@@ -1,5 +1,8 @@
+import asyncio
 import logging
 import os
+
+from src.derivatives.data_aggregator import DataAggregator
 
 from .feed_manager import FeedManager
 from .fmarket_client import FmarketClient
@@ -51,7 +54,10 @@ def main():
     logger.info(f"Fetched {len(fmarket_news)} Fmarket news items.")
 
     # Fetch Market Data
-    top_funds = fmarket_client.get_top_funds(limit=20, include_holdings=True)
+    # Enhanced: Sort by 12-month return for long-term view
+    top_funds = fmarket_client.get_top_funds(
+        limit=20, include_holdings=True, sort_field="navTo12Months"
+    )
     watchlist_funds = fmarket_client.get_funds_by_codes(
         ["DCDS", "DCDE", "BVFED", "VESAF", "SSISCA", "E1VFVN30"]
     )
@@ -71,6 +77,35 @@ def main():
     logger.info(
         f"VN30 Index: {vn30_current.get('current', 'N/A')} ({vn30_current.get('change_percent', 0):+.2f}%)"
     )
+
+    # Fetch Derivatives Data (Async wrapper)
+    logger.info("Fetching Derivatives data...")
+
+    async def get_derivatives():
+        aggregator = DataAggregator()
+        try:
+            return await aggregator.fetch_all_market_data(["VN30F1M"])
+        finally:
+            await aggregator.close()
+
+    derivatives_data = asyncio.run(get_derivatives())
+
+    # Store simplified derivatives info
+    derivatives_info = {
+        "futures": [],
+        "market_structure": derivatives_data.get("market_structure", []),
+    }
+    # Extract futures data from structure
+    if derivatives_data.get("market_structure"):
+        for item in derivatives_data["market_structure"]:
+            # Basic mapping
+                {
+                    "symbol": item.get("ticker"),
+                    "price": item.get("closePoint"),
+                    "changePercent": 0,
+                    "basis": item.get("basicPrice", 0),
+                }
+            )
 
     # Fetch Political/Policy News
     logger.info("Fetching political/policy news about stocks and funds...")
@@ -103,6 +138,7 @@ def main():
         "vn30_current": vn30_current,
         "vn30_symbols": vn30_symbols,
         "top_movers": vn30_top_movers,
+        "derivatives": derivatives_data,
         "political_news": political_news,
         "political_context": political_context,
     }

@@ -46,28 +46,22 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install .
+          pip install .[polymarket_analysis]
 
       - name: Run Polymarket Analysis
         env:
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
           DISCORD_WEBHOOK_POLYMARKET: ${{ secrets.DISCORD_WEBHOOK_POLYMARKET }}
+          SEARCH_PROVIDER: "ddg"
         run: |
           python -m src.poly_market.main \
             --events ${{ github.event.inputs.max_events || '10' }} \
             --markets ${{ github.event.inputs.max_markets || '3' }} \
             --confidence ${{ github.event.inputs.min_confidence || '5' }} \
             --edge ${{ github.event.inputs.min_edge || '0.10' }} \
-            --output results/polymarket_$(date +%Y%m%d_%H%M%S).json
-
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: polymarket-analysis-${{ github.run_number }}
-          path: results/*.json
-          retention-days: 30
+            --output results/polymarket_$(date +%Y%m%d_%H%M%S).json \
+            --
 
       - name: Commit results to repository
         if: success()
