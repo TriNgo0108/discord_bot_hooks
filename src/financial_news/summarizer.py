@@ -260,10 +260,6 @@ class NewsSummarizer:
                 parts.append("Watchlist Funds:\n" + "\n".join(fund_lines))
 
         # Top Funds
-        if (
-            "top_funds" in market_stats and "watchlist_funds" not in market_stats
-        ):  # Show top funds only if no watchlist, or maybe show both? Let's show both but separate headers.
-            pass  # Logic below handles top_funds. logic above handles watchlist.
 
         if "top_funds" in market_stats:
             funds = market_stats["top_funds"]

@@ -103,7 +103,7 @@ async def analyze_polymarket(
     # Load previously analyzed event IDs to exclude (if skip_analyzed is True)
     analyzed_event_ids = get_analyzed_event_ids() if skip_analyzed else set()
 
-    # Step 1: Fetch events
+    # Fetch events
     logger.info("Step 1: Fetching events from Polymarket...")
     async with PolymarketClient() as client:
         events = await client.fetch_events(limit=max_events)
@@ -125,7 +125,7 @@ async def analyze_polymarket(
         logger.info("All events have been previously analyzed. Nothing new to process.")
         return []
 
-    # Step 2 & 3: Research and analyze each market
+    # Research and analyze each market
     logger.info("Step 2-3: Researching and analyzing markets...")
     all_results = []
 
@@ -155,7 +155,7 @@ async def analyze_polymarket(
         # Rate limiting delay per event
         await asyncio.sleep(2)
 
-    # Step 4: Generate suggestions
+    # Generate suggestions
     logger.info("Step 4: Generating trading suggestions...")
     suggestions = engine.generate_suggestions_batch(all_results)
 
@@ -316,12 +316,10 @@ def main() -> None:
         )
     )
 
-    # Send Discord notification if requested
-    # Send Discord notification (always attempts if suggestions exist)
+    # Send Discord notification
     if suggestions:
         asyncio.run(send_discord_notification(suggestions))
 
-    # Exit with appropriate code
     sys.exit(0 if suggestions else 1)
 
 

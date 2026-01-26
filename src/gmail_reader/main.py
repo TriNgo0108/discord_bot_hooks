@@ -323,12 +323,10 @@ def fetch_recent_emails():
         return []
 
     try:
-        # Connect to Gmail IMAP
         mail = imaplib.IMAP4_SSL("imap.gmail.com")
         mail.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
         mail.select("INBOX")
 
-        # Search for unread emails from the last 24 hours
         yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%d-%b-%Y")
         status, message_ids = mail.search(None, f"SINCE {yesterday}")
 
@@ -482,7 +480,8 @@ def send_discord_webhook(emails):
     }
     httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": [header_embed]})
 
-    # Send each email as an embed
+    httpx.post(DISCORD_WEBHOOK_URL, json={"embeds": [header_embed]})
+
     for email_data in emails:
         body_text = email_data.get("body_text", "") or "No content"
         subject = email_data.get("subject", "No Subject")[:256]
@@ -556,8 +555,6 @@ def send_discord_webhook(emails):
                 author_field = {"name": sender}
             else:
                 title = f"{subject} (Part {i + 1})"
-                # Don't repeat author for subsequent parts to save space/cleanliness, or keep it?
-                # Let's keep it empty to show it's a continuation
                 author_field = {}
 
             embed = {

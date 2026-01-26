@@ -29,29 +29,26 @@ async def analyze_derivatives(instruments: list[str], send_discord: bool = True)
     logger.info("DERIVATIVES ANALYSIS PIPELINE")
     logger.info("=" * 60)
 
-    # 1. Shared HTTP Client
+    # Shared HTTP Client
     async with httpx.AsyncClient(timeout=DERIVATIVES_CONFIG.REQUEST_TIMEOUT) as client:
-        # 2. Data Aggregation (VNStock uses internal requests, so no client passed)
+        # Data Aggregation
         aggregator = DataAggregator()
         try:
             logger.info(f"Step 1: Fetching data for {instruments}...")
             market_data = await aggregator.fetch_all_market_data(instruments)
 
             futures_count = len(market_data.get("futures", []))
-            # market_structure is where VNStock data is currently stored
+            futures_count = len(market_data.get("futures", []))
             struct_count = len(market_data.get("market_structure", []))
 
-            # Add to total counts
             logger.info(f"Fetched: {futures_count} futures, {struct_count} structural reports")
 
-            # Ensure we have at least ONE type of data
             if futures_count == 0 and struct_count == 0:
                 logger.warning("No data fetched. Check internet connection or APIs.")
                 return
 
-            # 3. Research & Analysis
+            # Research & Analysis
             logger.info("Step 2: AI Research & Analysis...")
-            # Pass shared client
             analyzer = ResearchAnalyzer(http_client=client)
             analysis = await analyzer.analyze(market_data)
 
@@ -71,7 +68,7 @@ async def analyze_derivatives(instruments: list[str], send_discord: bool = True)
             for r in analysis.recommendations:
                 print(f"- {r.direction} {r.instrument} ({r.confidence}/10): {r.reasoning[:100]}...")
 
-            # 4. Discord Notification
+            # Discord Notification
             if DERIVATIVES_CONFIG.DISCORD_WEBHOOK_URL:
                 logger.info("Step 3: Sending Discord notification...")
                 embed = analysis.to_discord_embed()
