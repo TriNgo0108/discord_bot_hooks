@@ -11,6 +11,8 @@ import logging
 from typing import Any
 
 import httpx
+from bot_common.ddg_client import DDGClient
+from bot_common.tavily_client import TavilyClient
 from tenacity import (
     before_sleep_log,
     retry,
@@ -18,9 +20,6 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
-
-from src.common.ddg_client import DDGClient
-from src.common.tavily_client import TavilyClient
 
 from .config import AIConfig
 from .models import (

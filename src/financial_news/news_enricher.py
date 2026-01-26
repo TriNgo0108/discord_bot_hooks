@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import Any
 
-from src.common.tavily_client import TavilyClient
+from bot_common.tavily_client import TavilyClient
 
 logger = logging.getLogger(__name__)
 

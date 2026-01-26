@@ -7,7 +7,7 @@ import asyncio
 import logging
 from typing import Any
 
-from src.common.tavily_client import TavilyClient
+from bot_common.tavily_client import TavilyClient
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ class MarketEnricher:
         losers = top_movers.get("losers", [])[:3]
 
         symbols = [g["symbol"] for g in gainers if g.get("symbol")]
-        symbols += [l["symbol"] for l in losers if l.get("symbol")]
+        symbols += [loser["symbol"] for loser in losers if loser.get("symbol")]
 
         if not symbols:
             return ""

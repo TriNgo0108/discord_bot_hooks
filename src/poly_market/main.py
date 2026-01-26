@@ -43,7 +43,7 @@ def get_analyzed_event_ids(results_dir: str | None = None) -> set[str]:
     # Read all JSON files in results directory
     for json_file in results_path.glob("polymarket_*.json"):
         try:
-            with open(json_file, "r", encoding="utf-8") as f:
+            with open(json_file, encoding="utf-8") as f:
                 data = json.load(f)
 
             # Extract event IDs from suggestions

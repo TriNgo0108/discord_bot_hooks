@@ -1,7 +1,6 @@
 """AI Summarizer for Emails."""
 
 import logging
-from typing import Optional
 
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -27,7 +26,7 @@ GMAIL_SUMMARY_PROMPT = """You are an executive assistant extracting decision-cri
 class AISummarizer:
     """Uses LLM to summarize email content asynchronously."""
 
-    def __init__(self, config: Optional[AIConfig] = None):
+    def __init__(self, config: AIConfig | None = None):
         self.config = config or CONFIG.ai
 
     @retry(
@@ -36,7 +35,7 @@ class AISummarizer:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=False,  # Don't crash main loop on AI fail, just return None
     )
-    async def summarize(self, text: str) -> Optional[str]:
+    async def summarize(self, text: str) -> str | None:
         """Summarize text using configured AI model."""
         if not self.config.api_key:
             logger.warning("AI_API_KEY not set. Skipping summarization.")

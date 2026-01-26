@@ -1,5 +1,6 @@
 """Client for Vietnam derivatives data using vnstock."""
 
+import contextlib
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -66,10 +67,8 @@ class VNStockClient:
 
             if data_date_val:
                 if isinstance(data_date_val, str):
-                    try:
+                    with contextlib.suppress(ValueError):
                         data_date = datetime.strptime(data_date_val, "%Y-%m-%d")
-                    except ValueError:
-                        pass
                 else:
                     data_date = data_date_val
 

@@ -2,7 +2,7 @@
 
 import datetime
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class DiscordClient:
     """Async Client for sending notifications to Discord."""
 
-    def __init__(self, config: Optional[DiscordConfig] = None):
+    def __init__(self, config: DiscordConfig | None = None):
         self.config = config or CONFIG.discord
 
     async def send_summary(self, emails: list[dict[str, Any]]):
@@ -81,7 +81,7 @@ class DiscordClient:
         sender = email_data.get("from", "Unknown")[:256]
 
         # Strip header noise
-        lines = body_text.split("\n")
+        # Strip header noise
         clean_body = body_text
 
         chunks = split_text_smartly(clean_body)

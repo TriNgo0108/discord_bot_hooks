@@ -183,7 +183,7 @@ class NewsSummarizer:
 
             if losers:
                 loser_str = ", ".join(
-                    [f"{l['symbol']} ({l['change_percent']:+.2f}%)" for l in losers]
+                    [f"{loser['symbol']} ({loser['change_percent']:+.2f}%)" for loser in losers]
                 )
                 parts.append(f"Top Losers: {loser_str}")
 

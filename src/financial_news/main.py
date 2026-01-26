@@ -90,22 +90,16 @@ def main():
 
     derivatives_data = asyncio.run(get_derivatives())
 
-    # Store simplified derivatives info
-    derivatives_info = {
-        "futures": [],
-        "market_structure": derivatives_data.get("market_structure", []),
-    }
     # Extract futures data from structure
     if derivatives_data.get("market_structure"):
         for item in derivatives_data["market_structure"]:
             # Basic mapping
-                {
-                    "symbol": item.get("ticker"),
-                    "price": item.get("closePoint"),
-                    "changePercent": 0,
-                    "basis": item.get("basicPrice", 0),
-                }
-            )
+            {
+                "symbol": item.get("ticker"),
+                "price": item.get("closePoint"),
+                "changePercent": 0,
+                "basis": item.get("basicPrice", 0),
+            }
 
     # Fetch Political/Policy News
     logger.info("Fetching political/policy news about stocks and funds...")

@@ -4,7 +4,7 @@ import datetime
 import email
 import imaplib
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from .config import CONFIG, GmailConfig
 from .utils import (
@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 class GmailClient:
     """Client for interacting with Gmail via IMAP."""
 
-    def __init__(self, config: Optional[GmailConfig] = None):
+    def __init__(self, config: GmailConfig | None = None):
         self.config = config or CONFIG.gmail
-        self.mail: Optional[imaplib.IMAP4_SSL] = None
+        self.mail: imaplib.IMAP4_SSL | None = None
 
     def __enter__(self):
         self.connect()
@@ -92,7 +92,7 @@ class GmailClient:
             logger.error(f"Error searching emails: {e}")
             return []
 
-    def _fetch_single_email(self, email_id: bytes) -> Optional[dict[str, Any]]:
+    def _fetch_single_email(self, email_id: bytes) -> dict[str, Any] | None:
         """Fetch and process a single email by ID."""
         try:
             status, msg_data = self.mail.fetch(email_id, "(RFC822)")

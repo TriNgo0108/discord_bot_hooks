@@ -1,7 +1,6 @@
 """DuckDuckGo Search API Client."""
 
 import logging
-import warnings
 from typing import Any
 
 from ddgs import DDGS

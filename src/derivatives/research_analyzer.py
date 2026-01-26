@@ -5,8 +5,7 @@ import logging
 from typing import Any
 
 import httpx
-
-from src.common.tavily_client import TavilyClient
+from bot_common.tavily_client import TavilyClient
 
 from .config import DERIVATIVES_CONFIG
 from .models import DerivativesAnalysis, TradingRecommendation
@@ -14,7 +13,7 @@ from .models import DerivativesAnalysis, TradingRecommendation
 logger = logging.getLogger(__name__)
 
 # System prompt for GLM-4.7 analysis
-GLM_ANALYSIS_PROMPT = """You are a senior derivatives trading analyst at a quantitative hedge fund. 
+GLM_ANALYSIS_PROMPT = """You are a senior derivatives trading analyst at a quantitative hedge fund.
 Your task is to analyze aggregated derivatives market data and web research to provide actionable trading intelligence.
 
 ## Market Data

@@ -31,7 +31,7 @@ def fetch_incomplete_todos():
         SELECT id, content, priority, created_at
         FROM public.todo_read_model
         WHERE completed = false
-        ORDER BY 
+        ORDER BY
             CASE priority
                 WHEN 'High' THEN 1
                 WHEN 'Medium' THEN 2
