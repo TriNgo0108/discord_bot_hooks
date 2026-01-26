@@ -28,4 +28,4 @@ jobs:
           ENV: production
           DB_URL: ${{ secrets.DB_URL }}
           DISCORD_WEBHOOK_EXPENSE: ${{ secrets.DISCORD_WEBHOOK_EXPENSE }}
-        run: uv run python -m src.expense_report.main
+        run: uv run python -m expense_report.main
