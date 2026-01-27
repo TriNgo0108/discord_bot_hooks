@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-01-27T17:34:14.309038",
+  "total_suggestions": 1,
+  "suggestions": [
+    {
+      "event_id": "33506",
+      "event_title": "UEFA Champions League Winner ",
+      "market_id": "566139",
+      "market_question": "Will Real Madrid win the 2025–26 Champions League?",
+      "current_odds": 0.1,
+      "estimated_probability": 0.2,
+      "edge_percentage": 10.0,
+      "recommendation": "LONG",
+      "confidence": 7,
+      "reasoning": "Real Madrid is historically the most successful club in the competition. The current market odds of 10% (1 in 10) seem significantly undervalued for a perennial powerhouse and favorite in most seasons. Given their track record and historical prestige, a fair probability is closer to 20%.",
+      "risk_factors": [
+        "Squad turnover or aging key players not covered in search results.",
+        "Strong competition from other Premier League or German clubs."
+      ],
+      "key_findings": [
+        "Real Madrid is historically listed among the top men's title winners in the UEFA Champions League.",
+        "The search context reinforces Real Madrid's historical dominance in the competition."
+      ],
+      "sources": [
+        "https://news.google.com/topics/CAAqIQgKIhtDQkFTRGdvSUwyMHZNR014Y1RBU0FtbDBLQUFQAQ?hl=en-US&gl=US&ceid=US:en"
+      ],
+      "timestamp": "2026-01-27T17:34:14.308803"
+    }
+  ]
+}
