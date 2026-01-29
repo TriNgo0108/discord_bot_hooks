@@ -1,10 +1,10 @@
 import datetime
 import logging
 import os
-import time
 from typing import Any
 
 import httpx
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
 
@@ -12,65 +12,43 @@ logger = logging.getLogger(__name__)
 # OPTIMIZED PROMPT (Using prompt-engineering-patterns skill)
 # =============================================================================
 
-FINANCIAL_ANALYSIS_PROMPT = """You are a senior Vietnamese financial analyst at a top securities firm.
+FINANCIAL_ANALYSIS_PROMPT = """
+# CONTEXT
+You are a senior financial analyst at a top-tier securities firm in Vietnam. You specialize in synthesizing complex market data into actionable insights for retail investors.
 
-## Your Task
-Generate a daily briefing for Vietnamese retail investors based on market data (Funds, Stocks, Gold, Derivatives) and news.
+# OBJECTIVE
+Generate a high-value "Daily Financial Briefing" (Bản tin Tài chính) for Vietnamese retail investors. Synthesize the provided market data and news.
 
-## Analysis Framework (Think step-by-step)
+# CRITICAL CONSTRAINTS
+-   **LANGUAGE**: ALL output must be in **Vietnamese** (Tiếng Việt). Do not use English headers or phrases.
+-   **NO HALLUCINATIONS**: Do not invent data. If data is missing (e.g., no gold price), skip that section.
 
-### Step 1: Market Snapshot & Trends (12-Month focus)
-- **Funds**: Analyze top funds based on *12-month return*. Identify which sectors (Tech, Bank, etc.) are leading over the long term.
-- **Gold**: Analyze the 1-year price trend. Is the current price high or low relative to the 12-month range? Check the SJC vs World spread.
-- **Derivatives**: Check VN30F1M trend and basis (Futures - Index). Positive basis = bullish, Negative = bearish.
+# RESPONSE FORMAT
+Use GitHub-flavored Markdown. Structure:
 
-### Step 2: News Integration
-Group news by theme (Macro, Corporate, Policy). Identify potential catalysts for the next week.
+1.  **📊 Bức Tranh 12 Tháng & Xu Hướng**: Focus on Funds and Gold 12-month performance.
+2.  **📰 Điểm Tin & Tác Động**: Top news and its specific impact.
+3.  **💡 Khuyến Nghị Hành Động**: Specific advice for:
+    -   *Quỹ (Funds)*: Buy/Hold/Sell advice based on returns.
+    -   *Cổ phiếu (Stocks)*: Key tickers to watch.
+    -   *Vàng (Gold)*: Accumulate or Wait.
 
-### Step 3: Strategic Suggestions (CRITICAL)
-Provide specific, actionable advice for 4 categories:
-1.  **Funds**: Suggest *specific* funds to buy/hold based on 12M performance. (e.g., "Buy DCDS for growth").
-2.  **Gold**: Action (Buy/Sell/Hold) based on spread and trend.
-3.  **Stocks**: Pick 1-2 VN30 stocks to watch based on news or flow.
-4.  **Derivatives**: Suggest Long/Short bias based on basis and trend.
+# CHAIN OF THOUGHT & VERIFICATION (Internal Monologue)
+Before generating the final response, perform this checklist:
+1.  [ ] **Language Check**: Is every word in Vietnamese? (Translate concepts like "Buy", "Hold" to "Mua", "Nắm giữ").
+2.  [ ] **Data Check**: Did I cite specific numbers from the Input Data?
+3.  [ ] **Actionable Check**: Did I give at least one specific ticker or fund name to recommendation?
+4.  [ ] **Tone Check**: Is it professional yet decisive?
+5.  [ ] **Structure Check**: Did I follow the structure of the response?
+6.  [ ] **No Hallucination Check**: Did I invent data? If data is missing, skip that section.
+7.  [ ] **No English Check**: Did I use any English or chinese words? If so, translate them to Vietnamese.
+8.  [ ] **Did I follow Discord markdown formatting?**: Is the response formatted correctly for Discord?
 
----
+*Instructions: Perform the analysis steps, verify against the checklist, and then output ONLY the final Vietnamese response.*
 
-## Example Output
-
-**📊 Bức Tranh Thị Trường (12 Tháng)**
-- **Quỹ**: DCDS và FUEVFVND dẫn đầu với hiệu suất 12T > 15%, cho thấy xu hướng tích dòng vốn vào nhóm vốn hóa lớn.
-- **Vàng**: Đang ở vùng đỉnh 12 tháng. Spread SJC/World thu hẹp còn 2tr (thấp nhất năm) -> Cơ hội tích lũy.
-- **Phái sinh**: Basis dương 5 điểm -> Tâm lý trớn tăng tốt.
-
-**📰 Tin Tức & Động Lực**
-- Fed hạ lãi suất -> Tích cực cho chứng khoán cận biên.
-- FPT ra mắt chip mới -> Động lực cho nhóm công nghệ.
-
-**💡 Khuyến Nghị Đầu Tư**
-1.  **Chuyển đổi Quỹ**: Tăng tỷ trọng quỹ cổ phiếu (DCDS, VESAF) do kỳ vọng hồi phục kinh tế 2025.
-2.  **Vàng**: **MUA TÍCH SẢN** (Nhẫn trơn). Spread thấp là lợi thế an toàn.
-3.  **Cổ phiếu**: Canh mua HPG vùng 28.x (Hưởng lợi đầu tư công).
-4.  **Phái sinh**: **LONG** khi VN30F1M test lại hỗ trợ 1240.
-
----
-
-## Check & Verify
-- [ ] Did I mention 12-month fund performance?
-- [ ] Is there a specific Derivative suggestion?
-- [ ] Is the Gold suggestion based on the spread?
-
-## Output Requirements
-- Language: Vietnamese
-- Tone: Professional, insightful, actionable.
-- Format: Markdown with emojis.
-
----
-
+# INPUT DATA
 ## Market Data
 {market_data}
-
----
 
 ## News Headlines
 {news_headlines}
@@ -85,6 +63,31 @@ class NewsSummarizer:
         self.model_name = "glm-4.7"
         self.base_url = "https://api.z.ai/api/coding/paas/v4"
         self.max_retries = 5
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_fixed(2),
+        retry=retry_if_exception_type(Exception),
+        reraise=True,
+    )
+    def _call_zai_api(self, messages: list[dict[str, str]]) -> str:
+        """Call Z.AI API with tenacity retry logic."""
+        response = httpx.post(
+            f"{self.base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": self.model_name,
+                "messages": messages,
+                "temperature": 0.3,
+            },
+            timeout=180.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"].strip()
 
     def summarize(
         self, news_items: list[dict[str, Any]], market_stats: dict[str, Any] = None
@@ -112,40 +115,19 @@ class NewsSummarizer:
             news_headlines=news_text,
         )
 
-        # Call GLM-4.7 with retry
-        for attempt in range(self.max_retries + 1):
-            try:
-                response = httpx.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self.model_name,
-                        "messages": [
-                            {
-                                "role": "system",
-                                "content": "You are a senior Vietnamese financial analyst. Follow the analysis framework exactly and output in Vietnamese.",
-                            },
-                            {"role": "user", "content": prompt},
-                        ],
-                        "temperature": 0.3,
-                    },
-                    timeout=60.0,
-                )
-                response.raise_for_status()
-                data = response.json()
-                return data["choices"][0]["message"]["content"].strip()
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a specialized financial analysis AI. Follow the provided CO-STAR framework and instructions exactly.",
+            },
+            {"role": "user", "content": prompt},
+        ]
 
-            except Exception as e:
-                logger.warning(f"GLM-4.7 attempt {attempt + 1} failed: {e}")
-                if attempt < self.max_retries:
-                    time.sleep(2)
-                continue
-
-        logger.error("All GLM-4.7 attempts failed. Using fallback summary.")
-        return self._generate_fallback_summary(news_items, market_stats)
+        try:
+            return self._call_zai_api(messages)
+        except Exception as e:
+            logger.error(f"All GLM-4.7 attempts failed: {e}")
+            return self._generate_fallback_summary(news_items, market_stats)
 
     def _format_all_market_data(self, market_stats: dict[str, Any]) -> str:
         """Format all market data into a single string for the prompt."""
@@ -228,21 +210,6 @@ class NewsSummarizer:
                     f"Gold 12-Month Trend (SJC Sell): Start {fmt_item(start)} -> End {fmt_item(end)}"
                 )
                 parts.append(f"12-Month Range: Low {min_p:,.0f} - High {max_p:,.0f}")
-
-        # Derivatives Data
-        if "derivatives" in market_stats and market_stats["derivatives"]:
-            deriv = market_stats["derivatives"]
-            futures = deriv.get("futures", [])
-            for f in futures[:1]:  # Top 1 usually VN30F1M
-                parts.append(
-                    f"Derivatives: {f.get('symbol')} Price {f.get('price')} (Change {f.get('changePercent')}%) - Basis: {f.get('basis', 'N/A')}"
-                )
-
-            # Market Structure (Foreign flow etc if available)
-            if "market_structure" in deriv:
-                parts.append(
-                    f"Derivatives Market Structure: {str(deriv['market_structure'])[:200]}..."
-                )
 
         # Watchlist Funds
         if "watchlist_funds" in market_stats and market_stats["watchlist_funds"]:
