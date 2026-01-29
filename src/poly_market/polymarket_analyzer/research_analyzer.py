@@ -256,7 +256,6 @@ class ResearchAnalyzer:
                 query=str(final_query),
                 max_results=max_results,
                 days=30,  # Filter for last 30 days news
-                include_raw_content=False,
             )
 
             results = []
