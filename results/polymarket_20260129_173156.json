@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-01-29T17:36:23.849558",
+  "total_suggestions": 3,
+  "suggestions": [
+    {
+      "event_id": "27830",
+      "event_title": "2026 NBA Champion",
+      "market_id": "553856",
+      "market_question": "Will the Oklahoma City Thunder win the 2026 NBA Finals?",
+      "current_odds": 0.395,
+      "estimated_probability": 0.25,
+      "edge_percentage": 14.5,
+      "recommendation": "SHORT",
+      "confidence": 7,
+      "reasoning": "The market is pricing the Thunder as a near-dynasty with a ~40% chance to win the title in 2026. While the Thunder have arguably the best young core and asset sheet in the league, assigning a nearly 1 in 2 chance to a single team two years in the future is aggressive, especially given the volatility of player development and injury in the NBA. A 25% probability is a very strong bullish stance, but the market is over-leveraged.",
+      "risk_factors": [
+        "No current injury news or off-season updates available.",
+        "Unknown Western Conference power shifts (e.g., Nuggets, Mavericks, Warriors re-tooling).",
+        "Youth hitting a wall or regression."
+      ],
+      "key_findings": [
+        "No specific search results provided for this query.",
+        "Analysis relies on general market knowledge of the Thunder's roster construction (SGA, Holmgren, Williams) and draft capital.",
+        "The team is young and ascending, but the 39.5% implied probability is historically very high for a futures market two years out."
+      ],
+      "sources": [],
+      "timestamp": "2026-01-29T17:36:23.849294"
+    },
+    {
+      "event_id": "30829",
+      "event_title": "Democratic Presidential Nominee 2028",
+      "market_id": "559659",
+      "market_question": "Will Gretchen Whitmer win the 2028 Democratic presidential nomination?",
+      "current_odds": 0.017,
+      "estimated_probability": 0.15,
+      "edge_percentage": 13.3,
+      "recommendation": "LONG",
+      "confidence": 8,
+      "reasoning": "At 1.7%, the market is significantly undervaluing a sitting Governor of a swing state who has already been vetted for national office. In an open primary (assuming Biden does not run or is not the incumbent), Governors are typically strong frontrunners. Her odds should likely be closer to 10-15% given her bona fides.",
+      "risk_factors": [
+        "The Democratic party may pivot to a more progressive candidate, leaving Whitmer too moderate.",
+        "High-profile competition from figures like Kamala Harris or Gavin Newsom may split the moderate vote."
+      ],
+      "key_findings": [
+        "Gretchen Whitmer is the Governor of Michigan, a critical swing state.",
+        "She was a finalist for the Vice Presidential nomination in 2024 and 2020, indicating high regard within the party elite.",
+        "She has re-election experience and a track record of governing, fitting the standard profile for Democratic nominees."
+      ],
+      "sources": [
+        "General Political Analysis"
+      ],
+      "timestamp": "2026-01-29T17:36:23.849274"
+    },
+    {
+      "event_id": "23656",
+      "event_title": "Pro Football Champion 2026",
+      "market_id": "540208",
+      "market_question": "Will the Baltimore Ravens win Super Bowl 2026?",
+      "current_odds": 0.0,
+      "estimated_probability": 0.12,
+      "edge_percentage": 12.0,
+      "recommendation": "LONG",
+      "confidence": 7,
+      "reasoning": "The Ravens are legitimate championship contenders with an MVP quarterback and a solid roster construction. The market odds of 0.0% represent a significant inefficiency or lack of liquidity rather than true zero probability. An estimated 12% probability represents a massive edge over the market price, making this a strong LONG candidate.",
+      "risk_factors": [
+        "Historical playoff struggles of Lamar Jackson",
+        "Potential key defensive departures in free agency",
+        "Market illiquidity preventing exit"
+      ],
+      "key_findings": [
+        "No specific search results provided for the 2026 season.",
+        "General context: The Ravens consistently field a top-tier offense led by Lamar Jackson and a strong defense. They are perennial playoff contenders."
+      ],
+      "sources": [],
+      "timestamp": "2026-01-29T17:36:23.849246"
+    }
+  ]
+}
