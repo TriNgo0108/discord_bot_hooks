@@ -16,7 +16,6 @@ resolution-markers = [
 [manifest]
 members = [
     "bot-common",
-    "derivatives-analyzer",
     "discord-bot-hooks-monorepo",
     "expense-report",
     "financial-news",
