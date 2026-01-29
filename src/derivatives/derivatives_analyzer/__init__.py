@@ -1,1 +1,0 @@
-"""Derivatives analysis module."""

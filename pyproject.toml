@@ -5,7 +5,6 @@ description = "Monorepo for Discord Bot Hooks"
 requires-python = ">=3.11"
 dependencies = [
   "bot-common",
-  "derivatives-analyzer",
   "expense-report",
   "financial-news",
   "gmail-reader",
@@ -18,7 +17,6 @@ members = ["src/*"]
 
 [tool.uv.sources]
 bot-common = { workspace = true }
-derivatives-analyzer = { workspace = true }
 expense-report = { workspace = true }
 financial-news = { workspace = true }
 gmail-reader = { workspace = true }
