@@ -48,7 +48,8 @@ jobs:
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
           DISCORD_WEBHOOK_POLYMARKET: ${{ secrets.DISCORD_WEBHOOK_POLYMARKET }}
-          SEARCH_PROVIDER: "ddg"
+          WEBSEARCHAPI_KEY: ${{ secrets.WEBSEARCHAPI_KEY }}
+          SEARCH_PROVIDER: "websearchapi"
         run: |
           uv run python -m polymarket_analyzer \
             --events ${{ github.event.inputs.max_events || '10' }} \

@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "Polymarket Opportunity Analyzer"
 requires-python = ">=3.11"
 dependencies = [
-    "ddgs",
     "bot-common",
+    "json_repair>=0.12.0",
 ]
 
 [tool.uv.sources]

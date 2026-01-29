@@ -11,8 +11,8 @@ import logging
 from typing import Any
 
 import httpx
-from bot_common.ddg_client import DDGClient
 from bot_common.tavily_client import TavilyClient
+from bot_common.websearchapi_client import WebSearchApiClient
 from tenacity import (
     before_sleep_log,
     retry,
@@ -206,9 +206,9 @@ class ResearchAnalyzer:
         self.glm_semaphore = asyncio.Semaphore(2)
 
         # Initialize Search client
-        if self.config.SEARCH_PROVIDER == "ddg":
-            self.search_client = DDGClient()
-            logger.info("Using DuckDuckGo Search provider")
+        if self.config.SEARCH_PROVIDER == "websearchapi":
+            self.search_client = WebSearchApiClient(api_key=self.config.WEBSEARCHAPI_KEY)
+            logger.info("Using WebSearchAPI.ai Search provider")
         else:
             self.search_client = TavilyClient(api_key=self.config.TAVILY_API_KEY)
             logger.info("Using Tavily Search provider")
@@ -647,21 +647,31 @@ class ResearchAnalyzer:
             raise
 
     def _extract_json(self, content: str) -> dict[str, Any]:
-        """Extract JSON from response content."""
+        """Extract JSON from response content using robust parsing."""
+        from json_repair import repair_json
+
         # Try direct parse first
         try:
             return json.loads(content)
         except json.JSONDecodeError:
             pass
 
-        # Try to find JSON block in content
+        # Try with json_repair
+        try:
+            # repair_json returns a parsed object (dict/list) if valid, or string if return_objects=False
+            # By default it returns the parsed object.
+            return repair_json(content, return_objects=True)
+        except Exception as e:
+            logger.warning(f"json_repair failed: {e}")
+
+        # Fallback to regex extraction + json_repair
         import re
 
         json_match = re.search(r"\{[\s\S]*\}", content)
         if json_match:
             try:
-                return json.loads(json_match.group())
-            except json.JSONDecodeError:
+                return repair_json(json_match.group(), return_objects=True)
+            except Exception:
                 pass
 
         return {}

@@ -43,7 +43,10 @@ class AIConfig:
     # Tavily Search API
     TAVILY_API_KEY: str = ""
 
-    # Search Provider: "tavily" or "ddg"
+    # WebSearchAPI.ai settings
+    WEBSEARCHAPI_KEY: str = ""
+
+    # Search Provider: "tavily" or "websearchapi" (replaces ddg)
     SEARCH_PROVIDER: str = "tavily"
 
     @classmethod
@@ -54,6 +57,7 @@ class AIConfig:
             ZAI_MODEL=os.getenv("ZAI_MODEL", "glm-4.7"),
             PERPLEXITY_API_KEY=os.getenv("PERPLEXITY_API_KEY", ""),
             TAVILY_API_KEY=os.getenv("TAVILY_API_KEY", ""),
+            WEBSEARCHAPI_KEY=os.getenv("WEBSEARCHAPI_KEY", ""),
             SEARCH_PROVIDER=os.getenv("SEARCH_PROVIDER", "tavily").lower(),
         )
 
