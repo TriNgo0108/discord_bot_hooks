@@ -1,8 +1,5 @@
-import asyncio
 import logging
 import os
-
-from derivatives_analyzer.data_aggregator import DataAggregator
 
 from .feed_manager import FeedManager
 from .fmarket_client import FmarketClient
@@ -78,29 +75,6 @@ def main():
         f"VN30 Index: {vn30_current.get('current', 'N/A')} ({vn30_current.get('change_percent', 0):+.2f}%)"
     )
 
-    # Fetch Derivatives Data (Async wrapper)
-    logger.info("Fetching Derivatives data...")
-
-    async def get_derivatives():
-        aggregator = DataAggregator()
-        try:
-            return await aggregator.fetch_all_market_data(["VN30F1M"])
-        finally:
-            await aggregator.close()
-
-    derivatives_data = asyncio.run(get_derivatives())
-
-    # Extract futures data from structure
-    if derivatives_data.get("market_structure"):
-        for item in derivatives_data["market_structure"]:
-            # Basic mapping
-            {
-                "symbol": item.get("ticker"),
-                "price": item.get("closePoint"),
-                "changePercent": 0,
-                "basis": item.get("basicPrice", 0),
-            }
-
     # Fetch Political/Policy News
     logger.info("Fetching political/policy news about stocks and funds...")
     enricher = NewsEnricher()
@@ -132,7 +106,6 @@ def main():
         "vn30_current": vn30_current,
         "vn30_symbols": vn30_symbols,
         "top_movers": vn30_top_movers,
-        "derivatives": derivatives_data,
         "political_news": political_news,
         "political_context": political_context,
     }
