@@ -1,0 +1,53 @@
+{
+  "timestamp": "2026-01-30T13:13:00.592690",
+  "total_suggestions": 2,
+  "suggestions": [
+    {
+      "event_id": "33507",
+      "event_title": "English Premier League Winner ",
+      "market_id": "566190",
+      "market_question": "Will Newcastle win the 2025–26 English Premier League?",
+      "current_odds": 0.1,
+      "estimated_probability": 1.5,
+      "edge_percentage": 140.0,
+      "recommendation": "LONG",
+      "confidence": 6,
+      "reasoning": "The market odds of 0.1% are extremely low for a club with Newcastle's financial backing and potential. Even in a worst-case scenario, Newcastle is a top-6 contender. A true probability of ~1.5% (approx 66/1) is more realistic for a wealthy club aiming for Champions League spots. This represents a massive relative edge (Estimated is 15x higher than Market). Without search results to contradict this structural advantage, the LONG position is statistically favorable.",
+      "risk_factors": [
+        "Financial Fair Play (PSR) restrictions limiting squad investment.",
+        "Squad depth issues due to Champions League participation.",
+        "Lack of specific search data on current injuries or form."
+      ],
+      "key_findings": [
+        "No search results provided to verify current squad status, transfer plans, or management.",
+        "Newcastle is backed by Saudi PIF, providing significant financial resources.",
+        "Historically, Newcastle has the potential to break into the top 4, challenging for the title if other big clubs falter."
+      ],
+      "sources": [],
+      "timestamp": "2026-01-30T13:13:00.592396"
+    },
+    {
+      "event_id": "114242",
+      "event_title": "US strikes Iran by...?",
+      "market_id": "1294628",
+      "market_question": "US strikes Iran by February 5, 2026?",
+      "current_odds": 0.25,
+      "estimated_probability": 0.07,
+      "edge_percentage": 18.0,
+      "recommendation": "SHORT",
+      "confidence": 7,
+      "reasoning": "The market price of 25% implies a roughly 1-in-4 chance of a significant escalation (US strike on Iranian soil) by Feb 2026. This appears significantly overvalued compared to the Jan 31 market (11%). A 14% probability jump occurring solely within a 5-day window in early Feb 2026 suggests a pricing error or low liquidity rather than a genuine geopolitical event horizon. Based on historical US-Iran relations, the baseline probability of a direct US strike on the homeland is typically low (<10%). The market is likely mispricing the risk.",
+      "risk_factors": [
+        "Unknown specific intelligence regarding early February 2026 deadlines (e.g., nuclear talks, sanctions snapback).",
+        "Sudden escalation in the Middle East (e.g., involving Israel) that forces US involvement."
+      ],
+      "key_findings": [
+        "No specific search results were provided to explain the sharp probability divergence between the Jan 31 and Feb 5 markets.",
+        "Historical precedent suggests the US avoids direct strikes on Iranian soil due to escalation risks.",
+        "Market structure shows a +14% probability jump in just 5 days (Jan 31 vs Feb 5), which is statistically anomalous without a specific known catalyst (e.g., a scheduled diplomatic deadline or expiration)."
+      ],
+      "sources": [],
+      "timestamp": "2026-01-30T13:13:00.592449"
+    }
+  ]
+}
