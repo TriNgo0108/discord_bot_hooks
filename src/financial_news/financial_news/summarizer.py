@@ -181,20 +181,14 @@ class NewsSummarizer:
             # Format History Logic
             history = g.get("history", [])
             if history:
-                # History items have keys: reportDate (ms timestamp), askSjc, bidSjc
+                # History items have keys: date (YYYY-MM-DD), sjc_buy, sjc_sell
                 # Sort by date
-                history.sort(key=lambda x: x.get("reportDate", 0))
+                history.sort(key=lambda x: x.get("date", ""))
 
                 # Helper to format date and price
                 def fmt_item(item):
-                    ts = item.get("reportDate", 0)
-                    date_str = "N/A"
-                    if ts:
-                        # timestamp in ms
-                        dt = datetime.datetime.fromtimestamp(ts / 1000)
-                        date_str = dt.strftime("%Y-%m-%d")
-
-                    price = item.get("askSjc")
+                    date_str = item.get("date", "N/A")
+                    price = item.get("sjc_sell")
                     price_str = f"{price:,.0f}" if price else "N/A"
                     return f"{date_str}: {price_str}"
 
@@ -202,7 +196,7 @@ class NewsSummarizer:
                 end = history[-1]
 
                 # Find min/max in history
-                prices = [x.get("askSjc", 0) for x in history if x.get("askSjc")]
+                prices = [x.get("sjc_sell", 0) for x in history if x.get("sjc_sell")]
                 min_p = min(prices) if prices else 0
                 max_p = max(prices) if prices else 0
 

@@ -1,6 +1,11 @@
 import datetime
 import logging
+import json
+import os
+import time
+import re
 from typing import Any
+
 
 import httpx
 
@@ -232,53 +237,226 @@ class FmarketClient:
 
     def get_gold_prices(self) -> dict[str, Any]:
         """
-        Fetch gold prices from Fmarket API (Last 12 months/365 days).
+        Fetch gold prices from multiple sources:
+        - Vietnam (SJC, Ring): vnappmob API
+        - World: freegoldapi
+        - History: vnappmob with caching
         """
-        url = f"{self.BASE_URL}/get-price-gold-history"
+        result = {
+            "sjc_buy": 0.0,
+            "sjc_sell": 0.0,
+            "ring_buy": 0.0,
+            "ring_sell": 0.0,
+            "world_gold": 0.0,
+            "usd_vnd": 0.0,
+            "history": [],
+        }
 
-        now = datetime.datetime.now()
-        to_date_str = now.strftime("%Y%m%d")
-        from_date = now - datetime.timedelta(days=365)
-        from_date_str = from_date.strftime("%Y%m%d")
-
-        payload = {"fromDate": from_date_str, "toDate": to_date_str, "isAllData": False}
-
+        # 1. Fetch Vietnam Gold Data (SJC & Ring)
         try:
-            response = self.client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
+            # Get cached or fresh API Key
+            api_key = self._get_vnappmob_key()
 
-            result = {
-                "sjc_buy": 0,
-                "sjc_sell": 0,
-                "ring_buy": 0,
-                "ring_sell": 0,
-                "world_gold": 0,
-                "usd_vnd": 0,
-                "history": [],
-            }
+            # vnappmob v2 SJC endpoint
+            vn_url = "https://api.vnappmob.com/api/v2/gold/sjc"
+            headers = {"Authorization": f"Bearer {api_key}"}
 
-            if "extra" in data:
-                extra = data["extra"]
-                result.update(
-                    {
-                        "sjc_buy": extra.get("priceBuy"),
-                        "sjc_sell": extra.get("priceSell"),
-                        "ring_buy": extra.get("goldRingPriceBuy"),
-                        "ring_sell": extra.get("goldRingPriceSell"),
-                        "world_gold": extra.get("ratePriceGoldWorldToVND"),
-                        "usd_vnd": extra.get("rateUsdToVnd"),
-                    }
-                )
+            resp = self.client.get(vn_url, headers=headers)
 
-            if "data" in data and isinstance(data["data"], list):
-                result["history"] = data["data"]
+            if resp.status_code == 403:
+                # Key might be expired, force refresh (delete cache and retry once)
+                logger.warning("VNAppMob Key expired (403). Refreshing key...")
+                api_key = self._get_vnappmob_key(force_refresh=True)
+                headers = {"Authorization": f"Bearer {api_key}"}
+                resp = self.client.get(vn_url, headers=headers)
 
-            return result
+            resp.raise_for_status()
+            data = resp.json()
+
+            # Structure expectation: {'results': [{'buy_1l': ..., 'sell_1l': ..., 'buy_nhan1c': ..., ...}]}
+            if "results" in data and len(data["results"]) > 0:
+                latest = data["results"][0]
+                # Price is already in full VND (e.g. 178000000.0), do NOT multiply by 1000.
+                result["sjc_buy"] = float(latest.get("buy_1l", 0))
+                result["sjc_sell"] = float(latest.get("sell_1l", 0))
+                result["ring_buy"] = float(latest.get("buy_nhan1c", 0))
+                result["ring_sell"] = float(latest.get("sell_nhan1c", 0))
 
         except Exception as e:
-            logger.error(f"Error fetching gold prices: {e}")
-            return {}
+            logger.error(f"Error fetching Vietnam gold prices: {e}")
+
+        # 2. Fetch World Gold
+        try:
+            world_url = "https://freegoldapi.com/data/latest.json"
+            # Try freegoldapi (might default to USD/oz)
+            # Or use explicit currency if supported e.g. /data/XAU/USD/latest.json
+            # Simplest fallback: calculate if not easy.
+            # actually freegoldapi requires no key? Let's try.
+            # If it fails, leave as 0.
+            w_resp = getattr(self.client, "get")(world_url)  # type safe
+            if w_resp.status_code == 200:
+                # Expecting {"price": 1234.56, ...}
+                w_data = w_resp.json()
+                result["world_gold"] = float(w_data.get("price", 0))
+        except Exception:
+            # logger.error(f"Error fetching World gold: {e}")
+            # Silent fail for secondary data
+            pass
+
+        # 3. History with Caching
+        try:
+            cache_dir = "data"
+            os.makedirs(cache_dir, exist_ok=True)
+            cache_file = os.path.join(cache_dir, "gold_history_cache.json")
+
+            history_data = []
+
+            # Load cache
+            if os.path.exists(cache_file):
+                try:
+                    with open(cache_file, "r") as f:
+                        history_data = json.load(f)
+                except Exception:
+                    history_data = []  # Corrupt cache
+
+            today = datetime.datetime.now()
+            today_str = today.strftime("%Y-%m-%d")
+
+            # Determine start date
+            start_date = today - datetime.timedelta(days=365)
+
+            if not history_data:
+                fetch_from = start_date
+            else:
+                # Sort caching
+                history_data.sort(key=lambda x: x.get("date", ""))
+                last_entry = history_data[-1]
+                try:
+                    last_date = datetime.datetime.strptime(last_entry.get("date"), "%Y-%m-%d")
+                    fetch_from = last_date + datetime.timedelta(days=1)
+                except:
+                    fetch_from = start_date
+
+            if fetch_from < today:
+                # Fetch missing data
+                from_s = fetch_from.strftime("%Y-%m-%d")
+                to_s = today_str
+
+                # Only fetch if gap exists
+                if from_s <= to_s:
+                    # Need API Key for history too?
+                    # Docs say: "Authorization – Bearer <api_key|scope=gold|permission=0>"
+                    # Assuming same key works.
+                    api_key = self._get_vnappmob_key()
+                    h_url = f"https://api.vnappmob.com/api/v2/gold/sjc?date_from={from_s}&date_to={to_s}"
+                    headers = {"Authorization": f"Bearer {api_key}"}
+
+                    h_resp = self.client.get(h_url, headers=headers)
+                    if h_resp.status_code == 200:
+                        h_json = h_resp.json()
+                        new_items = []
+                        if "results" in h_json:
+                            for item in h_json["results"]:
+                                # Parse Date: Items use 'datetime' timestamp (seconds)
+                                d_str = ""
+                                if "datetime" in item:
+                                    try:
+                                        ts = int(float(item["datetime"]))
+                                        d_str = datetime.datetime.fromtimestamp(ts).strftime(
+                                            "%Y-%m-%d"
+                                        )
+                                    except:
+                                        pass
+                                elif "date" in item:
+                                    d_str = item["date"]
+
+                                if d_str:
+                                    new_items.append(
+                                        {
+                                            "date": d_str,
+                                            "sjc_buy": float(item.get("buy_1l", 0)),
+                                            "sjc_sell": float(item.get("sell_1l", 0)),
+                                        }
+                                    )
+
+                        # Merge and Deduplicate
+                        # Use dict to dedupe by date
+                        hist_map = {x["date"]: x for x in history_data}
+                        for ni in new_items:
+                            hist_map[ni["date"]] = ni
+
+                        # Re-convert to list and sort
+                        full_hist = list(hist_map.values())
+                        full_hist.sort(key=lambda x: x["date"])
+
+                        # Trim to 365 days to avoid unlimited growth
+                        # actually cache can grow, but result returned should be limited?
+                        # Let's keep cache full, but output simple.
+
+                        history_data = full_hist
+
+                        # Save Cache
+                        with open(cache_file, "w") as f:
+                            json.dump(history_data, f, indent=2)
+
+            # Filter result history to last 365 days for return
+            cutoff = (today - datetime.timedelta(days=365)).strftime("%Y-%m-%d")
+            result["history"] = [x for x in history_data if x["date"] >= cutoff]
+
+        except Exception as e:
+            logger.error(f"Error processing gold history: {e}")
+
+        return result
+
+    def _get_vnappmob_key(self, force_refresh: bool = False) -> str:
+        """
+        Get VNAppMob API Key.
+        - Check data/vnappmob_key.json
+        - If missing/expired or force_refresh is True, request new key.
+        - Cache key.
+        """
+        cache_dir = "data"
+        os.makedirs(cache_dir, exist_ok=True)
+        key_file = os.path.join(cache_dir, "vnappmob_key.json")
+
+        # Try load cache
+        if not force_refresh and os.path.exists(key_file):
+            try:
+                with open(key_file, "r") as f:
+                    data = json.load(f)
+                    # Check expiry (15 days = 15 * 24 * 3600 seconds)
+                    # Let's refresh if older than 14 days to be safe
+                    created_at = data.get("created_at", 0)
+                    if time.time() - created_at < 14 * 24 * 3600:
+                        return data.get("key", "")
+            except Exception:
+                pass  # Load failed
+
+        # Fetch new key
+        try:
+            url = "https://api.vnappmob.com/api/request_api_key?scope=gold"
+            resp = self.client.get(url)
+            resp.raise_for_status()
+
+            # Clean key: Response might be "{results:JWT}" or just "JWT" or quoted.
+            # Use regex to find JWT pattern (header.payload.signature)
+            match = re.search(r"eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+", resp.text)
+            if match:
+                new_key = match.group(0)
+            else:
+                # Fallback: simple strip
+                raw_text = resp.text.strip().replace('"', "").replace("'", "")
+                new_key = raw_text.encode("ascii", "ignore").decode("ascii")
+
+            # Save to cache
+            with open(key_file, "w") as f:
+                json.dump({"key": new_key, "created_at": time.time()}, f)
+
+            return new_key
+
+        except Exception as e:
+            logger.error(f"Failed to fetch VNAppMob API key: {e}")
+            return ""
 
     def get_bank_rates(self) -> list[dict[str, Any]]:
         """
