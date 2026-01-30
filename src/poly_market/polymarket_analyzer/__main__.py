@@ -320,8 +320,6 @@ def main() -> None:
     if suggestions:
         asyncio.run(send_discord_notification(suggestions))
 
-    sys.exit(0 if suggestions else 1)
-
 
 if __name__ == "__main__":
     main()
