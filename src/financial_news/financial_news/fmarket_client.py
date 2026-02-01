@@ -1,11 +1,10 @@
 import datetime
-import logging
 import json
+import logging
 import os
-import time
 import re
+import time
 from typing import Any
-
 
 import httpx
 
@@ -293,7 +292,7 @@ class FmarketClient:
             # Simplest fallback: calculate if not easy.
             # actually freegoldapi requires no key? Let's try.
             # If it fails, leave as 0.
-            w_resp = getattr(self.client, "get")(world_url)  # type safe
+            w_resp = self.client.get(world_url)  # type safe
             if w_resp.status_code == 200:
                 # Expecting {"price": 1234.56, ...}
                 w_data = w_resp.json()
@@ -314,7 +313,7 @@ class FmarketClient:
             # Load cache
             if os.path.exists(cache_file):
                 try:
-                    with open(cache_file, "r") as f:
+                    with open(cache_file) as f:
                         history_data = json.load(f)
                 except Exception:
                     history_data = []  # Corrupt cache
@@ -334,7 +333,7 @@ class FmarketClient:
                 try:
                     last_date = datetime.datetime.strptime(last_entry.get("date"), "%Y-%m-%d")
                     fetch_from = last_date + datetime.timedelta(days=1)
-                except:
+                except ValueError:
                     fetch_from = start_date
 
             if fetch_from < today:
@@ -365,7 +364,7 @@ class FmarketClient:
                                         d_str = datetime.datetime.fromtimestamp(ts).strftime(
                                             "%Y-%m-%d"
                                         )
-                                    except:
+                                    except (ValueError, TypeError):
                                         pass
                                 elif "date" in item:
                                     d_str = item["date"]
@@ -422,7 +421,7 @@ class FmarketClient:
         # Try load cache
         if not force_refresh and os.path.exists(key_file):
             try:
-                with open(key_file, "r") as f:
+                with open(key_file) as f:
                     data = json.load(f)
                     # Check expiry (15 days = 15 * 24 * 3600 seconds)
                     # Let's refresh if older than 14 days to be safe

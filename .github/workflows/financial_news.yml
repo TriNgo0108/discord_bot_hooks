@@ -26,6 +26,8 @@ jobs:
           DISCORD_WEBHOOK_FINANCE: ${{ secrets.DISCORD_WEBHOOK_FINANCE }}
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          MARKETSTACK_API_KEY: ${{ secrets.MARKETSTACK_API_KEY }}
+          MEDIASTACK_API_KEY: ${{ secrets.MEDIASTACK_API_KEY }}
         run: |
           uv run python -m financial_news
 

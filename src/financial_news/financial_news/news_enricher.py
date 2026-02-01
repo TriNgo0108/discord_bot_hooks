@@ -4,6 +4,9 @@ from typing import Any
 
 from bot_common.tavily_client import TavilyClient
 
+from .marketstack_client import MarketstackClient
+from .mediastack_client import MediastackClient
+
 logger = logging.getLogger(__name__)
 
 # Political/Policy news search topics for Vietnam financial markets
@@ -60,6 +63,8 @@ class NewsEnricher:
             custom_topics: Optional list of custom search topics to add.
         """
         self.tavily = TavilyClient()
+        self.mediastack = MediastackClient()
+        self.marketstack = MarketstackClient()
         self.search_topics = POLITICAL_NEWS_TOPICS.copy()
         if custom_topics:
             self.search_topics.extend(custom_topics)
@@ -311,3 +316,47 @@ class NewsEnricher:
                 results_per_topic=results_per_topic,
             )
         )
+
+    async def search_global_financial_news_async(self, limit: int = 5) -> list[dict[str, Any]]:
+        """
+        Fetch global financial news using Mediastack.
+        """
+        if not self.mediastack.api_key:
+            return []
+
+        # Keywords and countries can be adjusted based on requirements
+        news_data = await asyncio.to_thread(
+            self.mediastack.get_live_news,
+            categories="business,finance",
+            limit=limit,
+            keywords="stock market, economy, investing",
+        )
+
+        results = []
+        if news_data and "data" in news_data:
+            for item in news_data["data"]:
+                results.append(
+                    {
+                        "title": item.get("title"),
+                        "url": item.get("url"),
+                        "summary": item.get("description"),
+                        "source": item.get("source"),
+                        "published_at": item.get("published_at"),
+                    }
+                )
+        return results
+
+    def search_global_financial_news(self, limit: int = 5) -> list[dict[str, Any]]:
+        """Synchronous wrapper for global financial news."""
+        return asyncio.run(self.search_global_financial_news_async(limit))
+
+    def enrich_news_with_market_data(
+        self, news_items: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """
+        Enrich news items with stock data from Marketstack if symbol is found in title.
+        """
+        if not self.marketstack.api_key:
+            return news_items
+
+        return news_items

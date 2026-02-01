@@ -9,6 +9,8 @@ from typing import Any
 
 from bot_common.tavily_client import TavilyClient
 
+from .marketstack_client import MarketstackClient
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,6 +21,7 @@ class MarketEnricher:
 
     def __init__(self):
         self.tavily = TavilyClient()
+        self.marketstack = MarketstackClient()
 
     def _search(self, query: str, max_results: int = 5, timeout: int = 30) -> list[dict[str, str]]:
         """
@@ -132,11 +135,55 @@ class MarketEnricher:
         if not unique_holdings:
             return ""
 
+        if not unique_holdings:
+            return ""
+
         query = f"Vietnam stock fund investment {' '.join(unique_holdings)} performance outlook"
 
         logger.info("Searching fund context via Tavily...")
         results = self._search(query, max_results=3)
         return self._format_results(results)
+
+    async def search_market_data_async(self, symbols: list[str]) -> str:
+        """
+        Fetch market data (intraday/EOD) for symbols using Marketstack asynchronously.
+        """
+        if not self.marketstack.api_key or not symbols:
+            return ""
+
+        data_summary = []
+
+        async def fetch_symbol(symbol: str):
+            # Intraday
+            intraday = await asyncio.to_thread(self.marketstack.get_intraday, symbol)
+            if intraday and "data" in intraday and intraday["data"]:
+                latest = intraday["data"][0]
+                price = latest.get("last") or latest.get("close")
+                return f"- **{symbol}**: {price} (Intraday)"
+            else:
+                # EOD fallback
+                eod = await asyncio.to_thread(self.marketstack.get_eod, symbol)
+                if eod and "data" in eod and eod["data"]:
+                    latest = eod["data"][0]
+                    price = latest.get("close")
+                    date = latest.get("date", "")[:10]
+                    return f"- **{symbol}**: {price} (Close {date})"
+            return None
+
+        # Fetch all concurrently
+        tasks = [fetch_symbol(s) for s in symbols]
+        results = await asyncio.gather(*tasks)
+
+        data_summary = [r for r in results if r]
+
+        if not data_summary:
+            return ""
+
+        return "### Real-time/EOD Market Data:\n" + "\n".join(data_summary)
+
+    def search_market_data(self, symbols: list[str]) -> str:
+        """Synchronous wrapper for market data search."""
+        return asyncio.run(self.search_market_data_async(symbols))
 
     def enrich_market_stats(self, market_stats: dict[str, Any]) -> dict[str, str]:
         """
@@ -155,6 +202,7 @@ class MarketEnricher:
             "vn30_context": "",
             "stocks_context": "",
             "funds_context": "",
+            "market_data": "",
         }
 
         if not self.tavily.api_key:
@@ -177,5 +225,23 @@ class MarketEnricher:
 
         if top_funds or watchlist_funds:
             enrichments["funds_context"] = self.search_fund_context(market_stats)
+
+        # Enrich with Market Data (Marketstack)
+        # Collect relevant symbols from top movers and funds
+        symbols_to_check = []
+        if top_movers:
+            gainers = top_movers.get("gainers", [])[:2]
+            symbols_to_check.extend([g["symbol"] for g in gainers if g.get("symbol")])
+
+        if watchlist_funds:
+            for f in watchlist_funds:
+                holdings = f.get("top_holdings", [])
+                for h in holdings[:1]:  # Top 1 holding
+                    if h.get("stock_code"):
+                        symbols_to_check.append(h["stock_code"])
+
+        if symbols_to_check:
+            # Basic dedup
+            enrichments["market_data"] = self.search_market_data(list(set(symbols_to_check)))
 
         return enrichments
