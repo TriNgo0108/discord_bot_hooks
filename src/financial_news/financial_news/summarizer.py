@@ -64,7 +64,7 @@ class NewsSummarizer:
         self.max_retries = 5
 
     @retry(
-        stop=stop_after_attempt(5),
+        stop=stop_after_attempt(10),
         wait=wait_fixed(2),
         retry=retry_if_exception_type(Exception),
         reraise=True,

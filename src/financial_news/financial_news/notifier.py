@@ -20,7 +20,7 @@ def send_discord_webhook(
             try:
                 # Split summary into chunks of 1900 characters to be safe (Discord limit 2000)
                 # We split by newlines where possible to avoid breaking markdown
-                header = "**Daily Financial Briefing**\n\n"
+                header = ":flag_vn: **BẢN TIN TÀI CHÍNH HÀNG NGÀY**\n\n"
                 current_message = header
 
                 parts = summary.split("\n")
