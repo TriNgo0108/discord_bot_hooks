@@ -20,7 +20,6 @@ members = [
     "expense-report",
     "financial-news",
     "gmail-reader",
-    "health-check-bot",
     "polymarket-analyzer",
     "todo-notifier",
 ]
@@ -97,7 +96,6 @@ dependencies = [
     { name = "expense-report" },
     { name = "financial-news" },
     { name = "gmail-reader" },
-    { name = "health-check-bot" },
     { name = "polymarket-analyzer" },
     { name = "todo-notifier" },
 ]
@@ -113,7 +111,6 @@ requires-dist = [
     { name = "expense-report", editable = "src/expense_report" },
     { name = "financial-news", editable = "src/financial_news" },
     { name = "gmail-reader", editable = "src/gmail_reader" },
-    { name = "health-check-bot", editable = "src/health_check_bot" },
     { name = "polymarket-analyzer", editable = "src/poly_market" },
     { name = "todo-notifier", editable = "src/todo_notifier" },
 ]
@@ -208,16 +205,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515, upload-time = "2025-04-24T03:35:24.344Z" },
 ]
 
-[[package]]
-name = "health-check-bot"
-version = "0.1.0"
-source = { editable = "src/health_check_bot" }
-dependencies = [
-    { name = "httpx" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "httpx" }]
 
 [[package]]
 name = "httpcore"
