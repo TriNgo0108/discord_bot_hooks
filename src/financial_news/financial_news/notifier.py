@@ -17,33 +17,29 @@ def send_discord_webhook(
 
         # Send Summary First (if exists)
         if summary:
-            try:
-                # Split summary into chunks of 1900 characters to be safe (Discord limit 2000)
-                # We split by newlines where possible to avoid breaking markdown
-                header = ":flag_vn: **BẢN TIN TÀI CHÍNH HÀNG NGÀY**\n\n"
-                current_message = header
+            # Split summary into chunks of 1900 characters to be safe (Discord limit 2000)
+            # We split by newlines where possible to avoid breaking markdown
+            header = ":flag_vn: **BẢN TIN TÀI CHÍNH HÀNG NGÀY**\n\n"
+            current_message = header
 
-                parts = summary.split("\n")
+            parts = summary.split("\n")
 
-                for part in parts:
-                    if len(current_message) + len(part) + 1 > 1900:
-                        # Send current bucket
-                        payload = {"content": current_message}
-                        _post_to_discord(client, webhook_url, payload)
-                        current_message = part + "\n"
-                    else:
-                        current_message += part + "\n"
+            for part in parts:
+                if len(current_message) + len(part) + 1 > 1900:
+                    # Send current bucket
+                    payload = {"content": current_message}
+                    _post_to_discord(client, webhook_url, payload)
+                    current_message = part + "\n"
+                else:
+                    current_message += part + "\n"
 
-                # Send remaining
-                if current_message.strip():
-                    if current_message == header:
-                        pass
-                    else:
-                        payload = {"content": current_message}
-                        _post_to_discord(client, webhook_url, payload)
-
-            except Exception as e:
-                print(f"Failed to send summary: {e}")
+            # Send remaining
+            if current_message.strip():
+                if current_message == header:
+                    pass
+                else:
+                    payload = {"content": current_message}
+                    _post_to_discord(client, webhook_url, payload)
 
         chunk_size = 5
 
@@ -67,10 +63,7 @@ def send_discord_webhook(
 
             payload = {"embeds": embeds}
 
-            try:
-                _post_to_discord(client, webhook_url, payload)
-            except Exception as e:
-                print(f"Failed to send webhook chunk {i}: {e}")
+            _post_to_discord(client, webhook_url, payload)
 
 
 def _post_to_discord(client: httpx.Client, webhook_url: str, payload: dict[str, Any]) -> None:

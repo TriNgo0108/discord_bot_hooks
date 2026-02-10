@@ -34,11 +34,7 @@ async def main():
     logger.info(f"Selected topic: {topic}")
 
     # 2. Generate Content
-    try:
-        content = await generator.generate_knowledge(topic)
-    except Exception as e:
-        logger.error(f"Failed to generate content: {e}")
-        return
+    content = await generator.generate_knowledge(topic)
 
     # 3. Publish to Discord
     webhook = DiscordWebhook(url=config.DISCORD_WEBHOOK_URL)
@@ -53,14 +49,11 @@ async def main():
 
     webhook.add_embed(embed)
 
-    try:
-        response = webhook.execute()
-        if response.status_code == 200:
-            logger.info("Successfully sent to Discord.")
-        else:
-            logger.error(f"Failed to send to Discord: {response.status_code} {response.text}")
-    except Exception as e:
-        logger.error(f"Webhook execution failed: {e}")
+    response = webhook.execute()
+    if response.status_code == 200:
+        logger.info("Successfully sent to Discord.")
+    else:
+        logger.error(f"Failed to send to Discord: {response.status_code} {response.text}")
 
 
 if __name__ == "__main__":

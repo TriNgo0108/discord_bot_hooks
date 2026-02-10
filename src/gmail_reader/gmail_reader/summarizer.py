@@ -43,31 +43,27 @@ class AISummarizer:
 
         prompt = GMAIL_SUMMARY_PROMPT.format(email_content=text)
 
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    f"{self.config.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.config.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self.config.model,
-                        "messages": [
-                            {
-                                "role": "system",
-                                "content": "You are an executive assistant extracting decision-critical info from emails. Be concise and actionable.",
-                            },
-                            {"role": "user", "content": prompt},
-                        ],
-                        "temperature": 0.3,
-                    },
-                )
-                response.raise_for_status()
-                data = response.json()
-                return data["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            logger.warning(f"AI summarization failed: {e}")
-            raise  # Let tenacity handle retry
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{self.config.base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.config.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.config.model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are an executive assistant extracting decision-critical info from emails. Be concise and actionable.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.3,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"].strip()
 
         return None

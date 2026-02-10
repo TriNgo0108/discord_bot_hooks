@@ -122,11 +122,7 @@ class NewsSummarizer:
             {"role": "user", "content": prompt},
         ]
 
-        try:
-            return self._call_zai_api(messages)
-        except Exception as e:
-            logger.error(f"All GLM-4.7 attempts failed: {e}")
-            return self._generate_fallback_summary(news_items, market_stats)
+        return self._call_zai_api(messages)
 
     def _format_all_market_data(self, market_stats: dict[str, Any]) -> str:
         """Format all market data into a single string for the prompt."""

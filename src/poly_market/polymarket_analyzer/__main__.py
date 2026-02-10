@@ -135,21 +135,15 @@ async def analyze_polymarket(
         # Batch process markets for the event
         logger.info(f"Processing event: {event.title} ({len(markets)} markets)...")
 
-        try:
-            results = await analyzer.batch_research_and_analyze_event(event, markets)
-
-            for market, research, analysis in results:
-                if research and analysis:
-                    all_results.append((event, market, research, analysis))
-                    logger.info(
-                        f"  → {analysis.recommendation.value} "
-                        f"(edge: {analysis.edge_percentage:.1f}%, "
-                        f"confidence: {analysis.confidence}/10) - {market.question[:30]}..."
-                    )
-
-        except Exception as e:
-            logger.error(f"Failed to process event {event.id}: {e}")
-            continue
+        results = await analyzer.batch_research_and_analyze_event(event, markets)
+        for market, research, analysis in results:
+            if research and analysis:
+                all_results.append((event, market, research, analysis))
+                logger.info(
+                    f"  → {analysis.recommendation.value} "
+                    f"(edge: {analysis.edge_percentage:.1f}%, "
+                    f"confidence: {analysis.confidence}/10) - {market.question[:30]}..."
+                )
 
         # Rate limiting delay per event
         await asyncio.sleep(2)
@@ -178,21 +172,17 @@ def save_results(
     output_file: str,
 ) -> None:
     """Save suggestions to JSON file."""
-    try:
-        data = {
-            "timestamp": datetime.now().isoformat(),
-            "total_suggestions": len(suggestions),
-            "suggestions": [s.to_dict() for s in suggestions],
-        }
+    data = {
+        "timestamp": datetime.now().isoformat(),
+        "total_suggestions": len(suggestions),
+        "suggestions": [s.to_dict() for s in suggestions],
+    }
 
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
-        logger.info(f"Results saved to: {output_file}")
-
-    except Exception as e:
-        logger.error(f"Failed to save results: {e}")
+    logger.info(f"Results saved to: {output_file}")
 
 
 async def send_discord_notification(
@@ -235,19 +225,15 @@ async def send_discord_notification(
             }
         )
 
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                webhook_url,
-                json={
-                    "content": "📊 **Polymarket Trading Suggestions**",
-                    "embeds": embeds,
-                },
-            )
-            logger.info("Discord notification sent")
-
-    except Exception as e:
-        logger.error(f"Failed to send Discord notification: {e}")
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            webhook_url,
+            json={
+                "content": "📊 **Polymarket Trading Suggestions**",
+                "embeds": embeds,
+            },
+        )
+        logger.info("Discord notification sent")
 
 
 def main() -> None:

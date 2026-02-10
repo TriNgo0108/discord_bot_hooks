@@ -249,32 +249,27 @@ class ResearchAnalyzer:
             final_query = " ".join(query)
             logger.info(f"Combined {len(query)} queries into single request")
 
-        try:
-            # Use configured client
-            # pass days=30 for news filtering (handled by both clients)
-            response = await self.search_client.search(
-                query=str(final_query),
-                max_results=max_results,
-                days=30,  # Filter for last 30 days news
+        # Use configured client
+        # pass days=30 for news filtering (handled by both clients)
+        response = await self.search_client.search(
+            query=str(final_query),
+            max_results=max_results,
+            days=30,  # Filter for last 30 days news
+        )
+
+        results = []
+        for item in response.get("results", []):
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "snippet": item.get("content", ""),  # Both clients map to 'content'
+                    "date": item.get("published_date", ""),
+                }
             )
 
-            results = []
-            for item in response.get("results", []):
-                results.append(
-                    {
-                        "title": item.get("title", ""),
-                        "url": item.get("url", ""),
-                        "snippet": item.get("content", ""),  # Both clients map to 'content'
-                        "date": item.get("published_date", ""),
-                    }
-                )
-
-            logger.info(f"Found {len(results)} search results for query")
-            return results
-
-        except Exception as e:
-            logger.error(f"Web search failed: {e}")
-            return []
+        logger.info(f"Found {len(results)} search results for query")
+        return results
 
     async def analyze_with_glm(
         self,
@@ -347,26 +342,9 @@ class ResearchAnalyzer:
                     response.raise_for_status()
                     return response.json()
 
-            try:
-                data = await _call_zai_api()
-                content = data["choices"][0]["message"]["content"]
-                return self._parse_combined_response(market, content, search_results)
-            except httpx.HTTPStatusError as e:
-                logger.error(f"Z.AI API HTTP error: {e}")
-                logger.error(f"Response body: {e.response.text}")
-                return self._create_fallback_research(market), self._create_fallback_analysis(
-                    market
-                )
-            except httpx.RequestError as e:
-                logger.error(f"Z.AI API request failed (timeout/connection): {e}")
-                return self._create_fallback_research(market), self._create_fallback_analysis(
-                    market
-                )
-            except Exception as e:
-                logger.error(f"Analysis failed for market {market.id}: {e}")
-                return self._create_fallback_research(market), self._create_fallback_analysis(
-                    market
-                )
+            data = await _call_zai_api()
+            content = data["choices"][0]["message"]["content"]
+            return self._parse_combined_response(market, content, search_results)
 
     def _format_search_results(self, results: list[dict[str, str]]) -> str:
         """Format search results for the prompt."""
@@ -440,38 +418,30 @@ class ResearchAnalyzer:
                 odds_decimal_placeholder="0.XX",  # Correct placeholder for the example
             )
 
-            try:
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    response = await client.post(
-                        f"{self.config.ZAI_BASE_URL}/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {self.config.ZAI_API_KEY}",
-                            "Content-Type": "application/json",
-                        },
-                        json={
-                            "model": self.config.ZAI_MODEL,
-                            "messages": [
-                                {
-                                    "role": "system",
-                                    "content": "You are an expert prediction market analyst. Analyze web search results and provide trading recommendations. Always respond with valid JSON only.",
-                                },
-                                {"role": "user", "content": prompt},
-                            ],
-                            "temperature": 0.3,
-                        },
-                    )
-                    response.raise_for_status()
-                    data = response.json()
-                    content = data["choices"][0]["message"]["content"]
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(
+                    f"{self.config.ZAI_BASE_URL}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.config.ZAI_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.config.ZAI_MODEL,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": "You are an expert prediction market analyst. Analyze web search results and provide trading recommendations. Always respond with valid JSON only.",
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0.3,
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+                content = data["choices"][0]["message"]["content"]
 
-                    return self._parse_batch_response(markets, content, search_results)
-
-            except Exception as e:
-                logger.error(f"Batch analysis failed for event {event.id}: {e}")
-                return [
-                    (m, self._create_fallback_research(m), self._create_fallback_analysis(m))
-                    for m in markets
-                ]
+                return self._parse_batch_response(markets, content, search_results)
 
     def _parse_batch_response(
         self,
