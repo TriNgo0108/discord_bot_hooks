@@ -1,6 +1,6 @@
+import argparse
 import logging
 import sys
-import argparse
 
 from .db import fetch_incomplete_improvements
 from .notifier import format_improvement_message, send_discord_webhook

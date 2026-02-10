@@ -1,8 +1,8 @@
-name: Improvement Notification
+name: Tech Knowledge Hook
 
 on:
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 7 * * *"
   workflow_dispatch:
 
 jobs:
@@ -23,9 +23,10 @@ jobs:
       - name: Sync dependencies
         run: uv sync --frozen
 
-      - name: Run Improvement Notification
+      - name: Run Tech Knowledge Hook
         env:
-          DB_URL: ${{ secrets.DB_URL }}
-          DISCORD_WEBHOOK_IMPROVEMENT: ${{ secrets.DISCORD_WEBHOOK_IMPROVEMENT }}
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          DISCORD_WEBHOOK_TECH_KNOWLEDGE: ${{ secrets.DISCORD_WEBHOOK_TECH_KNOWLEDGE }}
           ENV: production
-        run: uv run python -m improvement_notifier
+        run: uv run python -m tech_knowledge

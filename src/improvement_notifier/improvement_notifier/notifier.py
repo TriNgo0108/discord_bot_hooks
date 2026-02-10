@@ -1,7 +1,7 @@
 import logging
-import httpx
-import httpx
 from datetime import datetime
+
+import httpx
 
 from .config import settings
 from .models import Improvement

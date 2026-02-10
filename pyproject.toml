@@ -11,6 +11,8 @@ dependencies = [
   "polymarket-analyzer",
   "todo-notifier",
   "improvement-notifier",
+  "financial-knowledge",
+  "tech-knowledge",
 ]
 
 [tool.uv.workspace]
@@ -24,6 +26,8 @@ gmail-reader = { workspace = true }
 polymarket-analyzer = { workspace = true }
 todo-notifier = { workspace = true }
 improvement-notifier = { workspace = true }
+financial-knowledge = { workspace = true }
+tech-knowledge = { workspace = true }
 
 [tool.ruff]
 line-length = 100

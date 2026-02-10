@@ -15,7 +15,7 @@ class TavilyClient:
 
     BASE_URL = "https://api.tavily.com/search"
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str | None = None) -> None:
         self.api_key = api_key or os.getenv("TAVILY_API_KEY")
         if not self.api_key:
             logger.warning("TAVILY_API_KEY not found. Search will be disabled.")

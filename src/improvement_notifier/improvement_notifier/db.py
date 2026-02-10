@@ -1,8 +1,9 @@
 import logging
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from collections.abc import Generator
 from contextlib import contextmanager
+
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 from .config import settings
 from .models import Improvement
@@ -36,12 +37,11 @@ def fetch_incomplete_improvements() -> list[Improvement]:
 
     improvements = []
 
-    with get_db_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(query)
-            rows = cursor.fetchall()
+    with get_db_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cursor:
+        cursor.execute(query)
+        rows = cursor.fetchall()
 
-            for row in rows:
-                improvements.append(Improvement(**row))
+        for row in rows:
+            improvements.append(Improvement(**row))
 
     return improvements
