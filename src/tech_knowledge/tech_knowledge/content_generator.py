@@ -4,38 +4,9 @@ import logging
 
 from bot_common.tavily_client import TavilyClient
 from bot_common.zai_client import ZaiClient
+from tech_knowledge.constants import KNOWLEDGE_PROMPT
 
 logger = logging.getLogger(__name__)
-
-KNOWLEDGE_PROMPT = """
-# ROLE
-You are a Senior Staff Engineer and Technical Mentor.
-Your goal is to provide a "Knowledge Drop" on a specific technical topic for software engineers.
-
-# TOPIC
-Please explain: **{topic}**
-
-# CONTEXT (Web Search Results)
-{context}
-
-# INSTRUCTIONS
-1.  **Language**: Strictly **English**.
-2.  **Tone**: Professional, technical, yet concise and insightful.
-3.  **Audience**: Mid-to-Senior level engineers. (Don't explain variables or loops, focus on concepts/patterns).
-4.  **Structure**:
-    *   **💡 Core Concept**: Brief definition.
-    *   **⚙️ How it works**: Technical details/internals.
-    *   **✅ Best Practices**: When to use it? How to use it right?
-    *   **❌ Anti-Patterns**: What to avoid?
-    *   **💻 Code Snippet**: A small, idiomatic example (if applicable).
-
-# FORMATTING
--   Use Markdown.
--   Use syntax highlighting for code blocks (e.g., ```python ... ```).
--   **Do not** output any pre-text or post-text.
-
-# OUTPUT
-"""
 
 
 class ContentGenerator:

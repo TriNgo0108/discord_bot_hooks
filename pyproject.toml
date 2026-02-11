@@ -13,6 +13,7 @@ dependencies = [
   "improvement-notifier",
   "financial-knowledge",
   "tech-knowledge",
+  "tech-news",
 ]
 
 [tool.uv.workspace]
@@ -28,6 +29,7 @@ todo-notifier = { workspace = true }
 improvement-notifier = { workspace = true }
 financial-knowledge = { workspace = true }
 tech-knowledge = { workspace = true }
+tech-news = { workspace = true }
 
 [tool.ruff]
 line-length = 100
