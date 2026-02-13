@@ -20,9 +20,11 @@ members = [
     "expense-report",
     "financial-knowledge",
     "financial-news",
+    "freelance-jobs",
     "gmail-reader",
     "improvement-notifier",
     "polymarket-analyzer",
+    "tech-interview",
     "tech-knowledge",
     "tech-news",
     "todo-notifier",
@@ -182,9 +184,11 @@ dependencies = [
     { name = "expense-report" },
     { name = "financial-knowledge" },
     { name = "financial-news" },
+    { name = "freelance-jobs" },
     { name = "gmail-reader" },
     { name = "improvement-notifier" },
     { name = "polymarket-analyzer" },
+    { name = "tech-interview" },
     { name = "tech-knowledge" },
     { name = "tech-news" },
     { name = "todo-notifier" },
@@ -201,9 +205,11 @@ requires-dist = [
     { name = "expense-report", editable = "src/expense_report" },
     { name = "financial-knowledge", editable = "src/financial_knowledge" },
     { name = "financial-news", editable = "src/financial_news" },
+    { name = "freelance-jobs", editable = "src/freelance_jobs" },
     { name = "gmail-reader", editable = "src/gmail_reader" },
     { name = "improvement-notifier", editable = "src/improvement_notifier" },
     { name = "polymarket-analyzer", editable = "src/poly_market" },
+    { name = "tech-interview", editable = "src/tech_interview" },
     { name = "tech-knowledge", editable = "src/tech_knowledge" },
     { name = "tech-news", editable = "src/tech_news" },
     { name = "todo-notifier", editable = "src/todo_notifier" },
@@ -287,6 +293,23 @@ requires-dist = [
     { name = "beautifulsoup4" },
     { name = "bot-common", editable = "src/common" },
     { name = "feedparser" },
+]
+
+[[package]]
+name = "freelance-jobs"
+version = "0.1.0"
+source = { editable = "src/freelance_jobs" }
+dependencies = [
+    { name = "bot-common" },
+    { name = "discord-webhook" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bot-common", editable = "src/common" },
+    { name = "discord-webhook", specifier = ">=1.3.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
 ]
 
 [[package]]
@@ -867,6 +890,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7b/ae/2d9c981590ed9999a0d91755b47fc74f74de286b0f5cee14c9269041e6c4/soupsieve-2.8.3.tar.gz", hash = "sha256:3267f1eeea4251fb42728b6dfb746edc9acaffc4a45b27e19450b676586e8349", size = 118627, upload-time = "2026-01-20T04:27:02.457Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/46/2c/1462b1d0a634697ae9e55b3cecdcb64788e8b7d63f54d923fcd0bb140aed/soupsieve-2.8.3-py3-none-any.whl", hash = "sha256:ed64f2ba4eebeab06cc4962affce381647455978ffc1e36bb79a545b91f45a95", size = 37016, upload-time = "2026-01-20T04:27:01.012Z" },
+]
+
+[[package]]
+name = "tech-interview"
+version = "0.1.0"
+source = { editable = "src/tech_interview" }
+dependencies = [
+    { name = "bot-common" },
+    { name = "discord-webhook" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bot-common", editable = "src/common" },
+    { name = "discord-webhook", specifier = ">=1.3.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
 ]
 
 [[package]]

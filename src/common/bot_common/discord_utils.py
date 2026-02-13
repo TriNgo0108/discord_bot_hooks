@@ -1,5 +1,10 @@
 """Utilities for Discord interactions."""
 
+import asyncio
+import logging
+
+from discord_webhook import DiscordEmbed, DiscordWebhook
+
 
 def split_message(message: str, limit: int = 4000) -> list[str]:
     """
@@ -33,3 +38,50 @@ def split_message(message: str, limit: int = 4000) -> list[str]:
         message = message[split_index:]
 
     return chunks
+
+
+async def send_discord_embeds(
+    webhook_url: str,
+    title_prefix: str,
+    content: str,
+    color: str,
+    footer_text: str,
+    logger_name: str = "discord_utils",
+    split_limit: int = 4000,
+) -> None:
+    """
+    Split content and send as Discord embeds via webhook.
+    """
+
+    logger = logging.getLogger(logger_name)
+    webhook = DiscordWebhook(url=webhook_url)
+
+    chunks = split_message(content, limit=split_limit)
+
+    for i, chunk in enumerate(chunks):
+        title = title_prefix
+        if len(chunks) > 1:
+            title += f" ({i + 1}/{len(chunks)})"
+
+        # Create Embed
+        embed = DiscordEmbed(
+            title=title,
+            description=chunk,
+            color=color,
+        )
+        embed.set_footer(text=footer_text)
+
+        webhook.add_embed(embed)
+
+        # Execute in thread to avoid blocking async loop
+        response = await asyncio.to_thread(webhook.execute)
+
+        if response.status_code == 200:
+            logger.info(f"Successfully sent chunk {i + 1}/{len(chunks)} to Discord.")
+        else:
+            logger.error(
+                f"Failed to send chunk {i + 1} to Discord: {response.status_code} {response.text}"
+            )
+
+        # Clear embeds for next chunk
+        webhook.remove_embeds()

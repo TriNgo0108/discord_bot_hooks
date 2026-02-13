@@ -27,5 +27,4 @@ jobs:
         env:
           DB_URL: ${{ secrets.DB_URL }}
           DISCORD_WEBHOOK_IMPROVEMENT: ${{ secrets.DISCORD_WEBHOOK_IMPROVEMENT }}
-          ENV: production
         run: uv run python -m improvement_notifier
