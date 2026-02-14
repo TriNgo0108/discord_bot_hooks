@@ -128,23 +128,12 @@ class NewsSummarizer:
         """Format all market data into a single string for the prompt."""
         parts = []
 
-        # VN30 Current Index (Real-time)
+        # VN30 Current Index (Real-time from DSC)
         if "vn30_current" in market_stats and market_stats["vn30_current"]:
             vn30 = market_stats["vn30_current"]
             parts.append(
                 f"VN30 Index: {vn30.get('current', 0):,.2f} ({vn30.get('change_percent', 0):+.2f}%), Volume: {vn30.get('volume', 0):,}"
             )
-        # Fallback to historical data if current not available
-        elif "vn30_index" in market_stats and market_stats["vn30_index"]:
-            vn30_data = market_stats["vn30_index"]
-            if len(vn30_data) >= 2:
-                latest = vn30_data[-1]
-                prev = vn30_data[-2]
-                change = latest["close"] - prev["close"]
-                change_pct = (change / prev["close"]) * 100 if prev["close"] > 0 else 0
-                parts.append(
-                    f"VN30 Index: {latest['close']:,.2f} ({change_pct:+.2f}%), Volume: {latest['volume']:,}"
-                )
 
         # Top Movers
         if "top_movers" in market_stats and market_stats["top_movers"]:
@@ -246,6 +235,68 @@ class NewsSummarizer:
         if "vn30_symbols" in market_stats and market_stats["vn30_symbols"]:
             symbols = market_stats["vn30_symbols"][:10]
             parts.append(f"VN30 Components: {', '.join(symbols)}")
+
+        # SSI VN30 Real-time Data (foreign flow, breadth, intraday)
+        if "ssi_vn30" in market_stats and market_stats["ssi_vn30"]:
+            ssi = market_stats["ssi_vn30"]
+            ssi_parts = []
+
+            # Index from SSI
+            idx = ssi.get("index")
+            if idx:
+                ssi_parts.append(
+                    f"SSI VN30: {idx.get('value', 0):,.2f} ({idx.get('change_percent', 0):+.2f}%), "
+                    f"Open: {idx.get('chart_open', 0):,.2f}, "
+                    f"High: {idx.get('chart_high', 0):,.2f}, Low: {idx.get('chart_low', 0):,.2f}"
+                )
+                ssi_parts.append(
+                    f"Market Breadth: {idx.get('advances', 0)} advances, "
+                    f"{idx.get('declines', 0)} declines, {idx.get('nochanges', 0)} unchanged"
+                )
+                ssi_parts.append(
+                    f"VN30 Total Volume: {idx.get('total_qtty', 0):,}, "
+                    f"Total Value: {idx.get('total_value', 0):,.0f} VND"
+                )
+
+            # Foreign flow summary
+            foreign = ssi.get("foreign_summary", {})
+            if foreign:
+                net = foreign.get("net_value", 0)
+                direction = "mua ròng" if net > 0 else "bán ròng"
+                ssi_parts.append(
+                    f"Foreign Flow: {direction} {abs(net):,.0f} VND "
+                    f"(Buy: {foreign.get('total_buy_value', 0):,.0f}, "
+                    f"Sell: {foreign.get('total_sell_value', 0):,.0f})"
+                )
+
+            # Top foreign buy/sell
+            top_buy = ssi.get("top_foreign_buy", [])[:3]
+            if top_buy:
+                buy_str = ", ".join(f"{s['symbol']} (+{s['net_qtty']:,})" for s in top_buy)
+                ssi_parts.append(f"Top Foreign Buy: {buy_str}")
+
+            top_sell = ssi.get("top_foreign_sell", [])[:3]
+            if top_sell:
+                sell_str = ", ".join(f"{s['symbol']} ({s['net_qtty']:,})" for s in top_sell)
+                ssi_parts.append(f"Top Foreign Sell: {sell_str}")
+
+            # SSI top gainers/losers
+            ssi_gainers = ssi.get("top_gainers", [])[:3]
+            if ssi_gainers:
+                g_str = ", ".join(
+                    f"{s['symbol']} ({s['change_percent']:+.2f}%)" for s in ssi_gainers
+                )
+                ssi_parts.append(f"SSI Top Gainers: {g_str}")
+
+            ssi_losers = ssi.get("top_losers", [])[:3]
+            if ssi_losers:
+                losers_str = ", ".join(
+                    f"{s['symbol']} ({s['change_percent']:+.2f}%)" for s in ssi_losers
+                )
+                ssi_parts.append(f"SSI Top Losers: {losers_str}")
+
+            if ssi_parts:
+                parts.append("\n".join(ssi_parts))
 
         # Perplexity AI Context (Web Research)
         if "perplexity_context" in market_stats and market_stats["perplexity_context"]:

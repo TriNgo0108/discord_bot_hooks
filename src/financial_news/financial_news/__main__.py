@@ -66,10 +66,22 @@ def main():
     # Fetch VN30 Stock Data
     logger.info("Fetching VN30 data...")
     stock_client = StockClient(source="VCI")
-    vn30_index = stock_client.get_vn30_index_history(days=7)
     vn30_current = stock_client.get_vn30_index()
     vn30_symbols = list(stock_client.get_vn30_symbols())
     vn30_top_movers = stock_client.get_vn30_top_movers(limit=5)
+
+    # Fetch SSI VN30 Data (supplements DSC with foreign flow, order book)
+    logger.info("Fetching SSI VN30 data...")
+    ssi_vn30 = stock_client.get_vn30_ssi_data()
+    if ssi_vn30.get("index"):
+        logger.info(
+            f"SSI VN30: {ssi_vn30['index']['value']:.2f} "
+            f"({ssi_vn30['index']['change_percent']:+.2f}%), "
+            f"Advances: {ssi_vn30['index']['advances']}, "
+            f"Declines: {ssi_vn30['index']['declines']}"
+        )
+    else:
+        logger.warning("SSI VN30 data unavailable, continuing with DSC data only")
 
     logger.info(
         f"VN30 Index: {vn30_current.get('current', 'N/A')} ({vn30_current.get('change_percent', 0):+.2f}%)"
@@ -102,10 +114,10 @@ def main():
         "watchlist_funds": watchlist_funds,
         "gold_prices": gold_prices,
         "bank_rates": bank_rates,
-        "vn30_index": vn30_index,
         "vn30_current": vn30_current,
         "vn30_symbols": vn30_symbols,
         "top_movers": vn30_top_movers,
+        "ssi_vn30": ssi_vn30,
         "political_news": political_news,
         "political_context": political_context,
     }

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .dsc_client import DSCClient
+from .ssi_client import SSIClient
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ class StockClient:
         self.source = source
         self._vn30_cache: set[str] | None = None
         self.dsc_client = DSCClient()
+        self.ssi_client = SSIClient()
 
     def get_vn30_symbols(self) -> set[str]:
         """Get list of VN30 index component symbols."""
@@ -188,14 +190,34 @@ class StockClient:
 
         return enriched
 
-    def get_vn30_index_history(self, days: int = 30) -> list[dict[str, Any]]:
+    def get_vn30_intraday_history(self) -> list[dict[str, Any]]:
         """
-        Fetch VN30 index historical data.
-        NOTE: DSC API does not provide 30-day daily history publicly.
-        Returning empty list until a history endpoint is found.
+        Fetch VN30 index intraday chart history from SSI.
+
+        Returns:
+            List of dicts with indexValue, time, vol, totalQtty.
         """
-        logger.warning("VN30 index history temporarily unavailable with DSC client")
+        try:
+            index_data = self.ssi_client.get_vn30_index()
+            if index_data and index_data.history:
+                return index_data.history
+        except Exception as e:
+            logger.error(f"Error fetching VN30 intraday history from SSI: {e}")
         return []
+
+    def get_vn30_ssi_data(self) -> dict[str, Any]:
+        """
+        Fetch aggregated VN30 market summary from SSI iBoard API.
+
+        Returns:
+            Dictionary with index, stocks, foreign_summary,
+            top_foreign_buy/sell, top_gainers/losers.
+        """
+        try:
+            return self.ssi_client.get_market_summary()
+        except Exception as e:
+            logger.error(f"Error fetching SSI VN30 data: {e}")
+            return {}
 
     def get_vn30_index(self) -> dict[str, Any]:
         """
