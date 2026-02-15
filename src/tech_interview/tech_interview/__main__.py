@@ -32,12 +32,14 @@ async def main():
     generator = ContentGenerator(zai_client, tavily_client)
 
     # 1. Select Topic
-    topic = selector.get_random_topic()
-    logger.info(f"Selected topic: {topic}")
+    topic_data = selector.get_random_topic()
+    topic = topic_data["content"]
+    topic_type = topic_data["type"]
+    logger.info(f"Selected topic: {topic} ({topic_type})")
 
     # 2. Generate Content
     try:
-        content = await generator.generate_interview_question(topic)
+        content = await generator.generate_interview_question(topic, topic_type)
     except Exception as e:
         logger.error(f"Failed to generate content: {e}")
         return
