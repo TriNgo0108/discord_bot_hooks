@@ -24,4 +24,4 @@ jobs:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           DISCORD_WEBHOOK_TECH_INTERVIEW: ${{ secrets.DISCORD_WEBHOOK_TECH_INTERVIEW }}
           ENV: production
-        run: uv run python tech_interview
+        run: uv run python -m tech_interview
