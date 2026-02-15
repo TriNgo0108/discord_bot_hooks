@@ -40,7 +40,8 @@ async def main():
         return
 
     # 3. Format Content
-    content = f"### 💼 Freelance Search: {keyword}\n\n"
+    # 3. Format Content
+    content = f"### 💼 Remote & Freelance Search: {keyword}\n\n"
     for job in jobs:
         title = job.get("title", "No Title")
         url = job.get("url", "#")
@@ -54,7 +55,9 @@ async def main():
 
     await send_discord_embeds(
         webhook_url=config.DISCORD_WEBHOOK_URL,
-        title_prefix=f"🚀 Freelance Opportunities: {keyword}",
+    await send_discord_embeds(
+        webhook_url=config.DISCORD_WEBHOOK_URL,
+        title_prefix=f"🚀 Remote & Freelance Opportunities: {keyword}",
         content=content,
         color=EMBED_COLOR,
         footer_text=f"Powered by Tavily • {datetime.now(UTC).strftime('%Y-%m-%d')}",
