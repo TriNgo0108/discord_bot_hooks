@@ -14,6 +14,7 @@ class Config:
 
     # API Keys
     TAVILY_API_KEY: str | None = os.getenv("TAVILY_API_KEY")
+    ZAI_API_KEY: str | None = os.getenv("ZAI_API_KEY")
 
     # Discord Webhook
     DISCORD_WEBHOOK_URL: str | None = os.getenv("DISCORD_WEBHOOK_FREELANCE_JOBS")

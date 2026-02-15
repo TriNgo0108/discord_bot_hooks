@@ -4,9 +4,11 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 
-from bot_common.tavily_client import TavilyClient
 from bot_common.discord_utils import send_discord_embeds
+from bot_common.tavily_client import TavilyClient
+from bot_common.zai_client import ZaiClient
 
+from freelance_jobs.analysis import JobAnalyzer
 from freelance_jobs.config import Config
 from freelance_jobs.constants import EMBED_COLOR
 from freelance_jobs.job_finder import JobFinder
@@ -26,8 +28,10 @@ async def main():
 
     # Initialize services
     tavily_client = TavilyClient(api_key=config.TAVILY_API_KEY)
+    zai_client = ZaiClient(api_key=config.ZAI_API_KEY)
     selector = KeywordSelector()
-    finder = JobFinder(tavily_client)
+    analyzer = JobAnalyzer(zai_client)
+    finder = JobFinder(tavily_client, analyzer)
 
     # 1. Select Keyword
     keyword = selector.get_random_keyword()
@@ -45,10 +49,24 @@ async def main():
     for job in jobs:
         title = job.get("title", "No Title")
         url = job.get("url", "#")
-        snippet = job.get("content", "No description available.")
-        if len(snippet) > 200:
-            snippet = snippet[:200] + "..."
-        content += f"**[{title}]({url})**\n> {snippet}\n\n"
+        analysis = job.get("analysis")
+
+        content += f"**[{title}]({url})**\n"
+
+        if analysis:
+            budget = analysis.budget or "N/A"
+            skills = ", ".join(analysis.skills) if analysis.skills else "N/A"
+            remote = analysis.remote_policy or "N/A"
+            duration = analysis.duration or "N/A"
+
+            content += f"💰 **Budget:** {budget} | ⏳ **Duration:** {duration}\n"
+            content += f"🏠 **Remote:** {remote} | 🛠 **Skills:** {skills}\n"
+            content += f"> {analysis.summary}\n\n"
+        else:
+            snippet = job.get("content", "No description available.")
+            if len(snippet) > 200:
+                snippet = snippet[:200] + "..."
+            content += f"> {snippet}\n\n"
 
     # 4. Publish to Discord
     await send_discord_embeds(
@@ -56,7 +74,7 @@ async def main():
         title_prefix=f"🚀 Remote & Freelance Opportunities: {keyword}",
         content=content,
         color=EMBED_COLOR,
-        footer_text=f"Powered by Tavily • {datetime.now(UTC).strftime('%Y-%m-%d')}",
+        footer_text=f"Powered by Tavily & GLM-4.7 • {datetime.now(UTC).strftime('%Y-%m-%d')}",
     )
 
 

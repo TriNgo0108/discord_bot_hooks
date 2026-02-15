@@ -5,6 +5,7 @@ from typing import TypedDict
 
 from bot_common.tavily_client import TavilyClient
 
+from freelance_jobs.analysis import JobAnalysis, JobAnalyzer, JobInput
 from freelance_jobs.constants import JOB_SEARCH_QUERY_TEMPLATE
 
 logger = logging.getLogger(__name__)
@@ -15,16 +16,18 @@ class Job(TypedDict):
     url: str
     content: str
     score: float
+    analysis: JobAnalysis | None
 
 
 class JobFinder:
     """Finds jobs using Web Search."""
 
-    def __init__(self, tavily_client: TavilyClient) -> None:
+    def __init__(self, tavily_client: TavilyClient, analyzer: JobAnalyzer) -> None:
         self.tavily_client = tavily_client
+        self.analyzer = analyzer
 
     async def find_jobs(self, keyword: str) -> list[Job]:
-        """Find recent freelance jobs for the given keyword."""
+        """Find and analyze recent freelance jobs for the given keyword."""
         search_query = JOB_SEARCH_QUERY_TEMPLATE.format(keyword=keyword)
         logger.info(f"Searching web for: {search_query}")
 
@@ -34,12 +37,41 @@ class JobFinder:
                 query=search_query,
                 search_depth="advanced",
                 max_results=5,
-                include_domains=None,  # We want broad search but maybe exclude saturated platforms later
+                include_domains=None,
                 days=3,  # Fresh content only
             )
-            # Cast results to Job TypedDict
-            results: list[Job] = response.get("results", [])
-            return results
+
+            raw_results = response.get("results", [])
+            if not raw_results:
+                return []
+
+            # Prepare for analysis
+            job_inputs: list[JobInput] = [
+                {
+                    "title": r.get("title", ""),
+                    "content": r.get("content", ""),
+                    "url": r.get("url", ""),
+                }
+                for r in raw_results
+            ]
+
+            # Analyze using LLM
+            analyses = await self.analyzer.analyze_jobs(job_inputs)
+
+            # Merge results
+            enriched_jobs: list[Job] = []
+            for i, raw in enumerate(raw_results):
+                job: Job = {
+                    "title": raw.get("title", ""),
+                    "url": raw.get("url", ""),
+                    "content": raw.get("content", ""),
+                    "score": raw.get("score", 0.0),
+                    "analysis": analyses[i] if i < len(analyses) else None,
+                }
+                enriched_jobs.append(job)
+
+            return enriched_jobs
+
         except Exception as e:
             logger.error(f"Job search failed: {e}")
             return []

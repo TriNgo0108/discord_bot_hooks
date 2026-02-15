@@ -21,5 +21,6 @@ jobs:
       - name: Run Freelance Jobs Hook
         env:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
           DISCORD_WEBHOOK_FREELANCE_JOBS: ${{ secrets.DISCORD_WEBHOOK_FREELANCE_JOBS }}
         run: uv run python -m freelance_jobs

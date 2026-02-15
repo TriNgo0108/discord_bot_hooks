@@ -1,7 +1,7 @@
 """Generates tech news content using GLM-4.7 and Tavily."""
 
-import logging
 import asyncio
+import logging
 from datetime import UTC, datetime
 
 from bot_common.tavily_client import TavilyClient
