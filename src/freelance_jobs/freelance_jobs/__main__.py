@@ -5,6 +5,7 @@ import logging
 from datetime import UTC, datetime
 
 from bot_common.tavily_client import TavilyClient
+from bot_common.discord_utils import send_discord_embeds
 
 from freelance_jobs.config import Config
 from freelance_jobs.constants import EMBED_COLOR
@@ -40,7 +41,6 @@ async def main():
         return
 
     # 3. Format Content
-    # 3. Format Content
     content = f"### 💼 Remote & Freelance Search: {keyword}\n\n"
     for job in jobs:
         title = job.get("title", "No Title")
@@ -51,10 +51,6 @@ async def main():
         content += f"**[{title}]({url})**\n> {snippet}\n\n"
 
     # 4. Publish to Discord
-    from bot_common.discord_utils import send_discord_embeds
-
-    await send_discord_embeds(
-        webhook_url=config.DISCORD_WEBHOOK_URL,
     await send_discord_embeds(
         webhook_url=config.DISCORD_WEBHOOK_URL,
         title_prefix=f"🚀 Remote & Freelance Opportunities: {keyword}",
