@@ -16,4 +16,4 @@ class TopicSelector:
 
     def get_random_topic(self) -> Topic:
         """Return a random topic from the curated list."""
-        return {"content": random.choice(GENERAL_TOPICS), "type": "general"}
+        return {"content": random.choice(CODING_TOPICS), "type": "coding"}

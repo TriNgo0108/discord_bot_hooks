@@ -16,6 +16,7 @@ dependencies = [
   "tech-news",
   "tech-interview",
   "freelance-jobs",
+  "coding-interview",
 ]
 
 [tool.uv.workspace]
@@ -34,6 +35,7 @@ tech-knowledge = { workspace = true }
 tech-news = { workspace = true }
 tech-interview = { workspace = true }
 freelance-jobs = { workspace = true }
+coding-interview = { workspace = true }
 
 [tool.ruff]
 line-length = 100

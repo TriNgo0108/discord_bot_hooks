@@ -1,0 +1,27 @@
+name: Coding Interview Hook
+
+on:
+  schedule:
+    - cron: "0 3,9,15,21 * * *"
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Run Coding Interview Hook
+        env:
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          DISCORD_WEBHOOK_TECH_INTERVIEW: ${{ secrets.DISCORD_WEBHOOK_TECH_INTERVIEW }}
+          ENV: production
+        run: uv run python -m coding_interview

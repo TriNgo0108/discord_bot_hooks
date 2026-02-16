@@ -1,0 +1,12 @@
+[project]
+name = "coding-interview"
+version = "0.1.0"
+description = "Tech Interview Question Generator for Discord Bot"
+dependencies = [
+    "bot-common",
+    "discord-webhook>=1.3.0",
+    "python-dotenv>=1.0.0",
+]
+
+[tool.uv.sources]
+bot-common = { workspace = true }
