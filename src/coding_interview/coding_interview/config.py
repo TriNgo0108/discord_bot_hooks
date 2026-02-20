@@ -13,7 +13,7 @@ class Config:
     TAVILY_API_KEY: str | None = os.getenv("TAVILY_API_KEY")
 
     # Discord Webhook
-    DISCORD_WEBHOOK_URL: str | None = os.getenv("DISCORD_WEBHOOK_TECH_INTERVIEW")
+    DISCORD_WEBHOOK_URL: str | None = os.getenv("DISCORD_WEBHOOK_CODING_INTERVIEW")
 
     # App Settings
     ENV: str = os.getenv("ENV", "development")

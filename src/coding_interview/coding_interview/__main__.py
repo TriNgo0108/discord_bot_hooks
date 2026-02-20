@@ -22,7 +22,7 @@ async def main():
     config = Config.from_env()
 
     if not config.DISCORD_WEBHOOK_URL:
-        logger.error("DISCORD_WEBHOOK_TECH_INTERVIEW not set. Exiting.")
+        logger.error("DISCORD_WEBHOOK_CODING_INTERVIEW not set. Exiting.")
         return
 
     # Initialize services
