@@ -1,7 +1,8 @@
 import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock
-from freelance_jobs.analysis import JobAnalysis, JobAnalyzer, JobInput
+
+from freelance_jobs.analysis import JobAnalyzer
 from freelance_jobs.job_finder import JobFinder
 
 
@@ -30,6 +31,7 @@ class TestFreelanceJobFinder(unittest.IsolatedAsyncioTestCase):
                 {
                     "budget": "$50/hr",
                     "skills": ["Python"],
+                    "required_knowledge": ["REST API design"],
                     "remote_policy": "Remote",
                     "duration": None,
                     "posted_date": None,
@@ -45,6 +47,7 @@ class TestFreelanceJobFinder(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(analyses), 1)
         self.assertEqual(analyses[0].budget, "$50/hr")
         self.assertEqual(analyses[0].skills, ["Python"])
+        self.assertEqual(analyses[0].required_knowledge, ["REST API design"])
         self.assertEqual(analyses[0].summary, "Python job summary")
 
         # Verify prompt construction (partial check)
@@ -56,16 +59,27 @@ class TestFreelanceJobFinder(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(analyses, [])
         self.mock_zai_client.chat_completion.assert_not_called()
 
-    async def test_job_analyzer_failure(self):
+    async def test_job_analyzer_failure_propagates(self):
+        """Unexpected exceptions should propagate, not be silently caught."""
         jobs = [{"title": "Job 1", "content": "Content 1", "url": "http://1"}]
 
         self.mock_zai_client.chat_completion.side_effect = Exception("API Error")
+
+        with self.assertRaises(Exception, msg="API Error"):
+            await self.job_analyzer.analyze_jobs(jobs)
+
+    async def test_job_analyzer_parse_failure_fallback(self):
+        """JSON parse errors should fall back to basic summaries."""
+        jobs = [{"title": "Job 1", "content": "Content 1", "url": "http://1"}]
+
+        self.mock_zai_client.chat_completion.return_value = "not valid json{{"
 
         analyses = await self.job_analyzer.analyze_jobs(jobs)
 
         # Should fallback to basic summary
         self.assertEqual(len(analyses), 1)
         self.assertIn("Content 1", analyses[0].summary)
+        self.assertEqual(analyses[0].required_knowledge, [])
 
     async def test_job_finder_integration(self):
         # Mock Tavily response
@@ -79,6 +93,7 @@ class TestFreelanceJobFinder(unittest.IsolatedAsyncioTestCase):
                 {
                     "budget": "$100",
                     "skills": ["Skill A"],
+                    "required_knowledge": ["System design"],
                     "remote_policy": "Hybrid",
                     "duration": "1 week",
                     "posted_date": "Today",

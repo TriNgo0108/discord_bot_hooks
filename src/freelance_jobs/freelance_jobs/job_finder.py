@@ -6,7 +6,7 @@ from typing import TypedDict
 from bot_common.tavily_client import TavilyClient
 
 from freelance_jobs.analysis import JobAnalysis, JobAnalyzer, JobInput
-from freelance_jobs.constants import JOB_SEARCH_QUERY_TEMPLATE
+from freelance_jobs.constants import JOB_SEARCH_QUERY_TEMPLATE, JOB_SITES
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class JobFinder:
     async def find_jobs(self, keyword: str) -> list[Job]:
         """Find and analyze recent freelance jobs for the given keyword."""
         search_query = JOB_SEARCH_QUERY_TEMPLATE.format(keyword=keyword)
-        logger.info(f"Searching web for: {search_query}")
+        logger.info("Searching web for: %s", search_query)
 
         try:
             # We use 'news' or 'advanced' depth to get recent results
@@ -37,7 +37,7 @@ class JobFinder:
                 query=search_query,
                 search_depth="advanced",
                 max_results=5,
-                include_domains=None,
+                include_domains=list(JOB_SITES),
                 days=3,  # Fresh content only
             )
 
@@ -73,5 +73,5 @@ class JobFinder:
             return enriched_jobs
 
         except Exception as e:
-            logger.error(f"Job search failed: {e}")
+            logger.error("Job search failed: %s", e)
             return []

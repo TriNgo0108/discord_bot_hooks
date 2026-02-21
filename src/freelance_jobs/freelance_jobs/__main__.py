@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-async def main():
+async def main() -> None:
     """Run the job finder."""
     config = Config.from_env()
 
@@ -35,7 +35,7 @@ async def main():
 
     # 1. Select Keyword
     keyword = selector.get_random_keyword()
-    logger.info(f"Selected keyword: {keyword}")
+    logger.info("Selected keyword: %s", keyword)
 
     # 2. Find Jobs
     jobs = await finder.find_jobs(keyword)
@@ -61,6 +61,12 @@ async def main():
 
             content += f"💰 **Budget:** {budget} | ⏳ **Duration:** {duration}\n"
             content += f"🏠 **Remote:** {remote} | 🛠 **Skills:** {skills}\n"
+
+            knowledge = (
+                ", ".join(analysis.required_knowledge) if analysis.required_knowledge else "N/A"
+            )
+            content += f"📚 **Required Knowledge:** {knowledge}\n"
+
             content += f"> {analysis.summary}\n\n"
         else:
             snippet = job.get("content", "No description available.")

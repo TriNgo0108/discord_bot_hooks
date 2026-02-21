@@ -4,9 +4,9 @@ import json
 import logging
 from typing import TypedDict
 
-from pydantic import BaseModel, Field
-
 from bot_common.zai_client import ZaiClient
+from pydantic import BaseModel, Field, ValidationError
+
 from freelance_jobs.constants import JOB_ANALYSIS_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,10 @@ class JobAnalysis(BaseModel):
 
     budget: str | None = Field(default=None, description="Budget or rate mentioned")
     skills: list[str] = Field(default_factory=list, description="List of technical skills")
+    required_knowledge: list[str] = Field(
+        default_factory=list,
+        description="Required domain knowledge, qualifications, and experience",
+    )
     remote_policy: str | None = Field(default=None, description="Remote work policy")
     duration: str | None = Field(default=None, description="Contract duration")
     posted_date: str | None = Field(default=None, description="Posted date")
@@ -61,7 +65,7 @@ class JobAnalyzer:
             {"role": "user", "content": prompt},
         ]
 
-        logger.info(f"Analyzing {len(jobs)} jobs with Z.AI...")
+        logger.info("Analyzing %d jobs with Z.AI...", len(jobs))
 
         try:
             response = await self.zai_client.chat_completion(
@@ -86,11 +90,9 @@ class JobAnalyzer:
             analyses = [JobAnalysis(**item) for item in data]
             return analyses
 
-        except Exception as e:
-            logger.error(f"Failed to analyze jobs: {e}")
-            # Return empty analysis objects as fallback to match length?
-            # Or just empty list? The prompt asks for a list.
-            # Let's return a list of empty analyses with original summaries as fallback if possible,
-            # but simpler to just return empty list or partials.
-            # To be safe and keep UI working, we might want to return basic objects.
+        except (json.JSONDecodeError, ValidationError) as e:
+            logger.warning("Failed to parse LLM response: %s", e)
             return [JobAnalysis(summary=job.get("content", "")[:100] + "...") for job in jobs]
+        except Exception as e:
+            logger.error("Unexpected error analyzing jobs: %s", e)
+            raise
