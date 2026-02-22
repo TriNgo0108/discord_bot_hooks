@@ -38,7 +38,6 @@ class JobFinder:
                 search_depth="advanced",
                 max_results=5,
                 include_domains=list(JOB_SITES),
-                days=3,  # Fresh content only
             )
 
             raw_results = response.get("results", [])

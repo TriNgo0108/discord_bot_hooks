@@ -71,7 +71,7 @@ JOB_SITES = [
 
 # Prompt for filtering/formatting
 # Domain filtering is handled by Tavily's include_domains parameter in job_finder.py
-JOB_SEARCH_QUERY_TEMPLATE = '"{{keyword}}" (remote OR freelance OR contract) last 3 days'
+JOB_SEARCH_QUERY_TEMPLATE = '"{keyword}" (remote OR freelance OR contract)'
 
 
 # Discord Embed Color (Green)
