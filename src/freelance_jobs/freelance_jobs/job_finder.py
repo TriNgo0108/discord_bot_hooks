@@ -72,5 +72,5 @@ class JobFinder:
             return enriched_jobs
 
         except Exception as e:
-            logger.error("Job search failed: %s", e)
+            logger.exception("Job search failed: %r", e)
             return []

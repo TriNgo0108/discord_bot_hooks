@@ -94,5 +94,5 @@ class JobAnalyzer:
             logger.warning("Failed to parse LLM response: %s", e)
             return [JobAnalysis(summary=job.get("content", "")[:100] + "...") for job in jobs]
         except Exception as e:
-            logger.error("Unexpected error analyzing jobs: %s", e)
+            logger.exception("Unexpected error analyzing jobs: %r", e)
             raise
