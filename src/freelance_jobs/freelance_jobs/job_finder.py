@@ -32,17 +32,27 @@ class JobFinder:
         logger.info("Searching web for: %s", search_query)
 
         try:
-            # We use 'news' or 'advanced' depth to get recent results
             response = await self.tavily_client.search(
                 query=search_query,
                 search_depth="advanced",
-                max_results=5,
+                max_results=20,
                 include_domains=list(JOB_SITES),
             )
 
             raw_results = response.get("results", [])
             if not raw_results:
                 return []
+
+            # Deduplicate by URL to prevent submitting duplicates to LLM
+            seen_urls = set()
+            unique_results = []
+            for r in raw_results:
+                url = r.get("url", "")
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    unique_results.append(r)
+
+            raw_results = unique_results
 
             # Prepare for analysis
             job_inputs: list[JobInput] = [

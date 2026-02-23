@@ -4,7 +4,6 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 
-from bot_common.discord_utils import send_discord_embeds
 from bot_common.tavily_client import TavilyClient
 from bot_common.zai_client import ZaiClient
 
@@ -44,44 +43,77 @@ async def main() -> None:
         logger.info("No jobs found for this keyword.")
         return
 
-    # 3. Format Content
-    content = f"### 💼 Remote & Freelance Search: {keyword}\n\n"
-    for job in jobs:
-        title = job.get("title", "No Title")
-        url = job.get("url", "#")
-        analysis = job.get("analysis")
+    # 3. Publish to Discord using individual embeds
+    from discord_webhook import DiscordEmbed, DiscordWebhook
 
-        content += f"**[{title}]({url})**\n"
+    logger.info("Publishing %d jobs to Discord...", len(jobs))
+    chunk_size = 10
+    job_chunks = [jobs[i : i + chunk_size] for i in range(0, len(jobs), chunk_size)]
 
-        if analysis:
-            budget = analysis.budget or "N/A"
-            skills = ", ".join(analysis.skills) if analysis.skills else "N/A"
-            remote = analysis.remote_policy or "N/A"
-            duration = analysis.duration or "N/A"
+    for i, chunk in enumerate(job_chunks):
+        webhook = DiscordWebhook(url=config.DISCORD_WEBHOOK_URL)
 
-            content += f"💰 **Budget:** {budget} | ⏳ **Duration:** {duration}\n"
-            content += f"🏠 **Remote:** {remote} | 🛠 **Skills:** {skills}\n"
+        if i == 0:
+            webhook.content = f"### 💼 Remote & Freelance Search: **{keyword}**"
 
-            knowledge = (
-                ", ".join(analysis.required_knowledge) if analysis.required_knowledge else "N/A"
+        for job in chunk:
+            title = job.get("title", "No Title")
+            url = job.get("url", "#")
+            analysis = job.get("analysis")
+
+            embed = DiscordEmbed(
+                title=title[:256],
+                url=url,
+                color=EMBED_COLOR,
             )
-            content += f"📚 **Required Knowledge:** {knowledge}\n"
 
-            content += f"> {analysis.summary}\n\n"
+            if analysis:
+                embed.description = analysis.summary
+
+                budget = analysis.budget or "N/A"
+                duration = analysis.duration or "N/A"
+                embed.add_embed_field(name="💰 Budget", value=budget, inline=True)
+                embed.add_embed_field(name="⏳ Duration", value=duration, inline=True)
+
+                remote = analysis.remote_policy or "N/A"
+                skills = ", ".join(analysis.skills) if analysis.skills else "N/A"
+                if len(skills) > 1024:
+                    skills = skills[:1020] + "..."
+                embed.add_embed_field(name="🏠 Remote", value=remote, inline=True)
+                embed.add_embed_field(name="🛠 Skills", value=skills, inline=False)
+
+                knowledge = (
+                    ", ".join(analysis.required_knowledge) if analysis.required_knowledge else "N/A"
+                )
+                if len(knowledge) > 1024:
+                    knowledge = knowledge[:1020] + "..."
+                if knowledge != "N/A":
+                    embed.add_embed_field(name="📚 Knowledge", value=knowledge, inline=False)
+            else:
+                snippet = job.get("content", "No description available.")
+                if len(snippet) > 2048:
+                    snippet = snippet[:2045] + "..."
+                embed.description = snippet
+
+            embed.set_footer(
+                text=f"Powered by Tavily & GLM-4.7 • {datetime.now(UTC).strftime('%Y-%m-%d')}"
+            )
+            webhook.add_embed(embed)
+
+        # Execute in thread to avoid blocking async loop
+        response = await asyncio.to_thread(webhook.execute)
+        if response.status_code in (200, 204):
+            logger.info("Successfully sent chunk %d/%d to Discord.", i + 1, len(job_chunks))
         else:
-            snippet = job.get("content", "No description available.")
-            if len(snippet) > 200:
-                snippet = snippet[:200] + "..."
-            content += f"> {snippet}\n\n"
+            logger.error(
+                "Failed to send chunk %d to Discord: %s %s",
+                i + 1,
+                response.status_code,
+                response.text,
+            )
 
-    # 4. Publish to Discord
-    await send_discord_embeds(
-        webhook_url=config.DISCORD_WEBHOOK_URL,
-        title_prefix=f"🚀 Remote & Freelance Opportunities: {keyword}",
-        content=content,
-        color=EMBED_COLOR,
-        footer_text=f"Powered by Tavily & GLM-4.7 • {datetime.now(UTC).strftime('%Y-%m-%d')}",
-    )
+        if i < len(job_chunks) - 1:
+            await asyncio.sleep(1)
 
 
 if __name__ == "__main__":
