@@ -15,8 +15,8 @@ async def test_main_sends_split_messages():
 
         # Mock Services
         with (
-            patch("tech_interview.__main__.ZaiClient") as MockZai,
-            patch("tech_interview.__main__.TavilyClient") as MockTavily,
+            patch("tech_interview.__main__.ZaiClient"),
+            patch("tech_interview.__main__.TavilyClient"),
             patch("tech_interview.__main__.TopicSelector") as MockSelector,
             patch("tech_interview.__main__.ContentGenerator") as MockGenerator,
             patch(

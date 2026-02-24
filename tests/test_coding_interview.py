@@ -15,8 +15,8 @@ async def test_coding_interview_main():
 
         # Mock Services
         with (
-            patch("coding_interview.__main__.ZaiClient") as MockZai,
-            patch("coding_interview.__main__.TavilyClient") as MockTavily,
+            patch("coding_interview.__main__.ZaiClient"),
+            patch("coding_interview.__main__.TavilyClient"),
             patch("coding_interview.__main__.TopicSelector") as MockSelector,
             patch("coding_interview.__main__.ContentGenerator") as MockGenerator,
             patch(

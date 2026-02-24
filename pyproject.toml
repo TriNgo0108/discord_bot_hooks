@@ -15,7 +15,6 @@ dependencies = [
   "tech-knowledge",
   "tech-news",
   "tech-interview",
-  "freelance-jobs",
   "coding-interview",
 ]
 
@@ -34,7 +33,6 @@ financial-knowledge = { workspace = true }
 tech-knowledge = { workspace = true }
 tech-news = { workspace = true }
 tech-interview = { workspace = true }
-freelance-jobs = { workspace = true }
 coding-interview = { workspace = true }
 
 [tool.ruff]

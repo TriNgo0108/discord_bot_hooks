@@ -1,5 +1,6 @@
 import unittest
-from bot_common.discord_utils import split_message, send_discord_embeds
+
+from bot_common.discord_utils import split_message
 
 
 class TestDiscordUtils(unittest.TestCase):

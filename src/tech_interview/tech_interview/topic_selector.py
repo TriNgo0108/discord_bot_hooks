@@ -3,7 +3,7 @@
 import random
 from typing import TypedDict
 
-from tech_interview.constants import CODING_TOPICS, GENERAL_TOPICS
+from tech_interview.constants import GENERAL_TOPICS
 
 
 class Topic(TypedDict):
