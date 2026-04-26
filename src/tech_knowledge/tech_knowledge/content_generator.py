@@ -4,7 +4,7 @@ import logging
 
 from bot_common.tavily_client import TavilyClient
 from bot_common.zai_client import ZaiClient
-from tech_knowledge.constants import KNOWLEDGE_PROMPT
+from tech_knowledge.constants import KNOWLEDGE_PROMPT, SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +18,9 @@ class ContentGenerator:
 
     async def generate_knowledge(self, topic: str) -> str:
         """Generate a knowledge article for the given topic."""
-        # 1. Fetch Context from Web
-        search_query = f"{topic} advanced concepts best practices"
-        logger.info(f"Searching web for: {search_query}")
+        # 1. Fetch Context from Web — topic already contains the right specificity
+        search_query = topic
+        logger.info("Searching web for: %s", search_query)
 
         context = await self.tavily_client.get_search_context(
             query=search_query, search_depth="basic", max_results=3
@@ -29,14 +29,15 @@ class ContentGenerator:
         if not context:
             context = "No external context available."
 
-        # 2. Generate Content
-        prompt = KNOWLEDGE_PROMPT.format(topic=topic, context=context)
+        # 2. Build prompt with instruction hierarchy:
+        #    System (identity + constraints) → User (task + context + structure)
+        user_prompt = KNOWLEDGE_PROMPT.format(topic=topic, context=context)
 
         messages = [
-            {"role": "system", "content": "You are an expert software engineer."},
-            {"role": "user", "content": prompt},
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
         ]
 
-        logger.info(f"Generating content for topic: {topic}")
+        logger.info("Generating content for topic: %s", topic)
         content = await self.zai_client.chat_completion(messages=messages)
         return content

@@ -1,19 +1,13 @@
-"""Selects topics for tech interview question generation."""
+"""Selects topics for English grammar lesson generation."""
 
 import random
-from typing import TypedDict
 
-from tech_interview.constants import GENERAL_TOPICS
-
-
-class Topic(TypedDict):
-    content: str
-    type: str
+from tech_interview.constants import GRAMMAR_TOPICS
 
 
 class TopicSelector:
-    """Selects a topic for the interview question."""
+    """Selects a grammar topic for the lesson."""
 
-    def get_random_topic(self) -> Topic:
+    def get_random_topic(self) -> str:
         """Return a random topic from the curated list."""
-        return {"content": random.choice(GENERAL_TOPICS), "type": "general"}
+        return random.choice(GRAMMAR_TOPICS)
