@@ -4,7 +4,8 @@ import logging
 
 from bot_common.tavily_client import TavilyClient
 from bot_common.zai_client import ZaiClient
-from tech_interview.constants import CODING_QUESTION_PROMPT, INTERVIEW_PROMPT
+
+from coding_interview.constants import CODING_QUESTION_PROMPT, INTERVIEW_PROMPT
 
 logger = logging.getLogger(__name__)
 
