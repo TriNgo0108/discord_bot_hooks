@@ -53,7 +53,7 @@ def main():
     # Fetch Market Data
     # Enhanced: Sort by 12-month return for long-term view
     top_funds = fmarket_client.get_top_funds(
-        limit=20, include_holdings=True, sort_field="navTo12Months"
+        limit=20, include_holdings=True, sort_field="navTo6Months"
     )
     watchlist_funds = fmarket_client.get_funds_by_codes(
         ["DCDS", "DCDE", "BVFED", "VESAF", "SSISCA", "E1VFVN30"]
